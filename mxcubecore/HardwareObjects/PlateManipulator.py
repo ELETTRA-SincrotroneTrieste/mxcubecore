@@ -255,7 +255,7 @@ class PlateManipulator(SampleChanger):
         self.stored_pos_y = 0.5
         self.plate_label = self.get_property("plateLabel")
         self.crims_url = self.get_property("crimsWsRoot")
-        self.plate_barcode = self.get_property("PlateBarode")
+        self.plate_barcode = self.get_property("PlateBarcode")
         self.harvester_key = self.get_property("harvesterKey")
 
         self.cmd_move_to_drop = self.get_command_object("MoveToDrop")
