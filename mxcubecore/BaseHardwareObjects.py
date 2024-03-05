@@ -298,7 +298,10 @@ class HardwareObjectNode:
             if attr not in self.__dict__ and attr in self._property_set:
                 self.set_property(attr, value)
             else:
-                self.__dict__[attr] = value
+                if isinstance(getattr(type(self), attr), property):
+                    super().__setattr__(attr, value)
+                else:
+                    self.__dict__[attr] = value
         except AttributeError:
             self.__dict__[attr] = value
 
