@@ -140,6 +140,9 @@ class Beamline(ConfiguredObject):
         # Beamline object
         self._hardware_object_id_dict = {}
 
+        # Enable phase control
+        self.enable_phase_control = True
+
     def init(self):
         """Object initialisation - executed *after* loading contents"""
         # Validate acquisition parameters
