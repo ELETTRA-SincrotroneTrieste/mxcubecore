@@ -289,6 +289,9 @@ class TangoChannel(ChannelObject):
 
     def poll_failed(self, e, poller_id):
         self.emit("update", None)
+        poller = Poller.get_poller(poller_id)
+        if poller is not None:
+            poller.restart(1000)
         """
         emit_update = True
         if self.value is None:
