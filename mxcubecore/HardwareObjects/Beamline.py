@@ -140,6 +140,9 @@ class Beamline(ConfiguredObject):
         # Beamline object
         self._hardware_object_id_dict = {}
 
+        # Name of the manual centring procedure
+        self.manual_centring_name = "3-Click"
+
     def init(self):
         """Object initialisation - executed *after* loading contents"""
         # Validate acquisition parameters
