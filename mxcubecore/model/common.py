@@ -19,7 +19,7 @@ class PathParameters(BaseModel):
     )
 
     class Config:
-        extra: "ignore"
+        extra = "ignore"
 
 
 class LegacyParameters(BaseModel):
@@ -29,7 +29,7 @@ class LegacyParameters(BaseModel):
     overlap: float
 
     class Config:
-        extra: "ignore"
+        extra = "ignore"
 
 
 class StandardCollectionParameters(BaseModel):
@@ -48,7 +48,7 @@ class StandardCollectionParameters(BaseModel):
     shape: str = ""
 
     class Config:
-        extra: "ignore"
+        extra = "ignore"
 
 
 class BeamlineParameters(BaseModel):
