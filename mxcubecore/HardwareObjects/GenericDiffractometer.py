@@ -619,6 +619,14 @@ class GenericDiffractometer(HardwareObject):
             DiffractometerState.Ready
         )
 
+    def is_moving(self):
+        """
+        Detects if device is moving
+        """
+        return self.current_state == DiffractometerState.tostring(
+            DiffractometerState.Moving
+        )
+
     def wait_device_not_ready(self, timeout=5):
         with gevent.Timeout(timeout, Exception("Timeout waiting for device not ready")):
             while self.is_ready():
