@@ -142,6 +142,8 @@ class Beamline(ConfiguredObject):
 
         # Enable phase control
         self.enable_phase_control = True
+        # Name of the manual centring procedure
+        self.manual_centring_name = "3-Click"
 
     def init(self):
         """Object initialisation - executed *after* loading contents"""
