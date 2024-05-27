@@ -993,7 +993,7 @@ class HardwareObject(HardwareObjectNode, HardwareObjectMixin):
         HardwareObjectNode.__init__(self, rootName)
         HardwareObjectMixin.__init__(self)
         self.log: "Logger" = logging.getLogger("HWR").getChild(self.__class__.__name__)
-        self.user_log: "Logger" = logging.getLogger("user_log_level")
+        self.user_log: "Logger" = logging.getLogger("user_level_log")
         self.__exports: Dict[str, Any] = {}
         self.__pydantic_models: Dict[str, Type["BaseModel"]] = {}
         self._exported_attributes: Dict[str, Any] = {}
