@@ -75,10 +75,10 @@ class Proposal(OrmInterface):
 
 class Session(OrmInterface):
     scheduled: int
-    startDate: Union[datetime | str]
-    endDate: Union[datetime | str]
+    startDate: Union[datetime, str]
+    endDate: Union[datetime, str]
     beamlineName: str
-    timeStamp: Optional[Union[datetime | str]]
+    timeStamp: Optional[Union[datetime, str]]
     comments: Optional[str]
     sessionId: int
     proposalId: int
