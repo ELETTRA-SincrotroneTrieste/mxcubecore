@@ -62,11 +62,6 @@ class XRD1DetectorPilatus(AbstractDetector):
         self._exposure_time_limits = eval(self.get_property("exposure_time_limits",
                                                             "[0.04, 60000]"))
         self.ch_state = self.get_channel_object("state", optional=False)
-        self.ch_energy_threshold = self.get_channel_object("energy_threshold",
-                                                           optional=False)
-        self.ch_last_image_taken = self.get_channel_object("last_image_taken",
-                                                           optional=False)
-        self.cmd_start_acq = self.get_command_object("start_acq")
         self.cmd_start_acq = self.get_command_object("start_acq")
         self.cmd_stop_acq = self.get_command_object("stop_acq")
         self.cmd_reset = self.get_command_object("restart")
