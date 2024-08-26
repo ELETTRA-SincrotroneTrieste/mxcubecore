@@ -325,3 +325,5 @@ class BeamlineActions(HardwareObject):
                 if cmd.name() == name:
                     cmd.abort()
                     break
+            else:
+                raise KeyError
