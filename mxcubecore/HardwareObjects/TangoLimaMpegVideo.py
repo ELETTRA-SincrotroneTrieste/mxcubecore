@@ -1,5 +1,5 @@
 """
-Class for streaming MPEG1 video with cameras connected to 
+Class for streaming MPEG1 video with cameras connected to
 Lima Tango Device Servers
 
 Example configuration:
@@ -96,9 +96,12 @@ class TangoLimaMpegVideo(TangoLimaVideo):
 
     def stop_streaming(self):
         if self._video_stream_process:
-            ps = psutil.Process(self._video_stream_process.pid).children() + [
-                self._video_stream_process
-            ]
+            try:
+                ps = psutil.Process(self._video_stream_process.pid).children() + [
+                    self._video_stream_process
+                ]
+            except psutil.NoSuchProcess:
+                ps = []
 
             for p in ps:
                 p.kill()
@@ -119,4 +122,4 @@ class TangoLimaMpegVideo(TangoLimaVideo):
 
     def restart_streaming(self, size):
         self.stop_streaming()
-        self.start_streaming(self._format)
+        self.start_streaming(self._format, size)
