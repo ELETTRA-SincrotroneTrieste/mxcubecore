@@ -411,6 +411,9 @@ class ISPyBAPIClient(HardwareObject):
             if mx_collection.get('oscillation_sequence')[0].get('number_of_images'):
                 data_collection['numberOfImages'] = \
                     mx_collection['oscillation_sequence'][0]['number_of_images']
+            if mx_collection.get('oscillation_sequence')[0].get('exposure_time'):
+                data_collection['exposureTime'] = \
+                    mx_collection['oscillation_sequence'][0]['exposure_time']
             if mx_collection.get('oscillation_sequence')[0].get('start_image_number'):
                 data_collection['startImageNumber'] = \
                     mx_collection['oscillation_sequence'][0]['start_image_number']
