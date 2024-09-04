@@ -23,6 +23,10 @@ __credits__ = ["ELETTRA"]
 __license__ = "LGPLv3+"
 __category__ = "General"
 
+import subprocess
+import sys
+from pathlib import Path
+
 from mxcubecore.HardwareObjects.TangoLimaMpegVideo import TangoLimaMpegVideo
 
 
@@ -36,11 +40,45 @@ class XRD1CameraBZoom(TangoLimaMpegVideo):
     def get_available_stream_sizes(self):
         try:
             w, h = self.get_width(), self.get_height()
-            video_sizes = [(w, h), (int(w * 0.8), int(h * 0.8)), (int(w * 0.6), int(h * 0.6))]
+            video_sizes = [(w, h), (int(w * 0.8), int(h * 0.8)), (int(w * 0.6),
+                                                                  int(h * 0.6))
+                           ]
         except (ValueError, AttributeError):
             video_sizes = []
 
         return video_sizes
+
+    def start_video_stream_process(self, port):
+        if (
+            not self._video_stream_process
+            or self._video_stream_process.poll() is not None
+        ):
+            streamer_py_path = Path(__file__).parent.parent.joinpath('video_streamer', 'main.py')
+            self._video_stream_process = subprocess.Popen(
+                [
+                    f"{sys.executable}",
+                    f"{streamer_py_path}",
+                    "-tu",
+                    self.get_property("tangoname").strip(),
+                    "-hs",
+                    "localhost",
+                    "-p",
+                    port,
+                    "-q",
+                    str(self._quality),
+                    "-s",
+                    self._current_stream_size,
+                    "-of",
+                    self._format,
+                    "-vf",
+                    "-id",
+                    self.stream_hash,
+                ],
+                close_fds=True,
+            )
+
+            with open("/tmp/mxcube.pid", "a") as f:
+                f.write("%s " % self._video_stream_process.pid)
 
     def restart_streaming(self, size):
         self.stop_streaming()
