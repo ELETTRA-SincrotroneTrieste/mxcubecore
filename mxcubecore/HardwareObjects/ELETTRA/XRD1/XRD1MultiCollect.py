@@ -156,21 +156,29 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
                 "Failed to store data collection metadata in to LIMS")
 
         self.cmd_start()
+        t_start = time.time()
         exp_time = float(data_collect_parameters['oscillation_sequence'][0]['exposure_time'])
         num_imgs = float(data_collect_parameters['oscillation_sequence'][0]['number_of_images'])
         total_acq_time = exp_time * num_imgs
-        time.sleep(0.5)
-        num = 0
-        while self.ch_state.get_value() not in [PyTango.DevState.OFF, PyTango.DevState.FAULT]:
-            try:
-                last_num = 1# self.bl_control.detector.get_last_image_taken_number()
-                if last_num > num:
-                    num = last_num
-                    self.emit('collectImageTaken', num)
-            except Exception:
-                self.log.exception("Can not retrieve last image number the detector")
-            finally:
-                time.sleep(self.ch_state.polling / 1000)
+        offset = 10
+        with gevent.Timeout(total_acq_time + offset,
+                            TimeoutError(f"Timed out. The datacollection "
+                                         f"\"{self.username}\" took too much time to "
+                                         f"end (more than the total exposure: "
+                                         f"{total_acq_time} sec)")):
+            while True:
+                try:
+                    if self.ch_state.get_value() in [PyTango.DevState.OFF,
+                                                     PyTango.DevState.FAULT]:
+                        break
+                except PyTango.DevFailed.timeout:
+                    pass
+
+                elapsed_time = min(time.time() - t_start, total_acq_time)
+                num = int(num_imgs * (elapsed_time/total_acq_time))
+                self.emit('collectImageTaken', num)
+                gevent.sleep(self.ch_state.polling / 1000)
+
 
         print(f"QUEUE --- id: {sample_id}")
 
