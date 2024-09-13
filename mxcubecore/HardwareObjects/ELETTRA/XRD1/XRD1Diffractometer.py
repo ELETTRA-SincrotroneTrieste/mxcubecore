@@ -175,6 +175,9 @@ class XRD1Diffractometer(GenericDiffractometer):
 
         stream_width, stream_height, image_scale = \
             HWR.beamline.sample_view.camera.get_stream_size()
+        stream_width = float(stream_width)
+        stream_height = float(stream_height)
+        image_scale = float(image_scale)
         image_height = float(HWR.beamline.sample_view.camera.get_height())
         image_width = float(HWR.beamline.sample_view.camera.get_width())
 
@@ -452,7 +455,11 @@ class XRD1Diffractometer(GenericDiffractometer):
     @hwo_header_log
     def update_zoom(self, pos=None):
         if not pos:
-            pos = self.zoom.get_value().value
+            pos = self.zoom.get_value()
+        if pos == self.zoom.VALUES.UNKNOWN:
+            pos = None
+        else:
+            pos = pos.value
         self.current_motor_positions["zoom"] = pos
         self.pixels_per_mm_x = int(1 / (self.zoom.get_um_per_pixel() / 1000.))
         self.pixels_per_mm_y = int(1 / (self.zoom.get_um_per_pixel() / 1000.))
