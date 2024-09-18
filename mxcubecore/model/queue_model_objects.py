@@ -1737,7 +1737,7 @@ class AcquisitionParameters(object):
         self.in_queue = False
         self.in_interleave = None
         self.sub_wedge_size = 10
-
+        self.detector_modes = ['0', 'C18', 'C12', 'C2']
         self.num_triggers = int()
         self.num_images_per_trigger = int()
         self.hare_num = 1
@@ -1787,6 +1787,7 @@ class AcquisitionParameters(object):
             "mesh_center": self.mesh_center,
             "cell_spacing": self.cell_spacing,
             "sub_wedge_size": self.sub_wedge_size,
+            "detector_modes": self.detector_modes,
         }
 
     def copy(self):
