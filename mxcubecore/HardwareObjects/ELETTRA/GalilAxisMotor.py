@@ -133,6 +133,9 @@ class GalilAxisMotor(AbstractMotor):
     @hwo_header_log
     def abort(self):
 
+        if self.read_only:
+            raise ValueError("Attempt to abort a read-only Actuator")
+
         try:
             self.cmd_stop()
             self.log.info(f"Abort command sent to the axis \"{self.username}\"")
