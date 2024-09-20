@@ -358,3 +358,12 @@ class ElettraSession(HardwareObject):
         :rtype: str
         """
         return self.user_group
+
+    @hwo_header_log
+    def clear_session(self):
+        self._session_id = None
+        self.visit_num = None
+        self.proposal_code = None
+        self.proposal_number = None
+        self.proposal_id = None
+        self.in_house_users = []
