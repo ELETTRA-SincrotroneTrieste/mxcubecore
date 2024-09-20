@@ -57,8 +57,8 @@ class XRD1Diffractometer(GenericDiffractometer):
         PyTango.DevState.UNKNOWN: GenericDiffractometer.STATES.UNKNOWN
     }
 
-    CENTRING_METHOD_MANUAL = "Manual 2-click"
-    MANUAL3CLICK_MODE = "Manual 2-click"
+    GenericDiffractometer.CENTRING_METHOD_MANUAL = "Manual 2-click"
+    GenericDiffractometer.MANUAL3CLICK_MODE = "Manual 2-click"
 
     def __init__(self, *args):
 
@@ -169,26 +169,19 @@ class XRD1Diffractometer(GenericDiffractometer):
 
     @hwo_header_log
     def convert_pixels_to_mm(self, x, y):
+        # Pixels received are already scaled (from the frontend). For example, the 'x'
+        # range will be [0, image width] and the 'y' range will be [0, image height],
+        # where the image width and height are the dimensions at which the camera is
+        # acquiring
 
-        # read um per pixel takes into account the zoom level (at least it should )
-        mm_per_pixel = self.zoom.get_um_per_pixel() / 1000.
-
-        stream_width, stream_height, image_scale = \
-            HWR.beamline.sample_view.camera.get_stream_size()
-        stream_width = float(stream_width)
-        stream_height = float(stream_height)
-        image_scale = float(image_scale)
         image_height = float(HWR.beamline.sample_view.camera.get_height())
         image_width = float(HWR.beamline.sample_view.camera.get_width())
 
-        scale_ratio_x = stream_width / image_width
-        scale_ratio_y = stream_height / image_height
+        # Get mm/px ratio based on the current zoom
+        mm_per_pixel = self.zoom.get_um_per_pixel() / 1000.
 
-        mm_per_pixel_x_scaled = mm_per_pixel / scale_ratio_x
-        mm_per_pixel_y_scaled = mm_per_pixel / scale_ratio_y
-
-        x_mm = float(x - (stream_width / 2.0)) * mm_per_pixel_x_scaled
-        y_mm = float((stream_height / 2.0) - y) * mm_per_pixel_y_scaled
+        x_mm = float(x - (image_width / 2.0)) * mm_per_pixel
+        y_mm = float((image_height / 2.0) - y) * mm_per_pixel
 
         return x_mm, y_mm
 
