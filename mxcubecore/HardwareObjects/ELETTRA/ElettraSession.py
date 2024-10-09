@@ -41,7 +41,7 @@ class ElettraSession(HardwareObject):
 
         self.synchrotron_name = None
         self.beamline_name = None
-
+        self.tag = None
         self._session_id = None
         self.visit_num = None
         self.proposal_code = None
@@ -71,6 +71,7 @@ class ElettraSession(HardwareObject):
     def init(self):
         self.synchrotron_name = self.get_property("synchrotron_name")
         self.beamline_name = self.get_property("beamline_name")
+        self.tag = self.get_property("tag")
         self.endstation_name = self.get_property("endstation_name").lower()
 
         self.suffix = self["file_info"].get_property("file_suffix")
@@ -126,6 +127,11 @@ class ElettraSession(HardwareObject):
             return f"{self.proposal_number}-{self.visit_num}"
         else:
             raise ValueError
+
+    @hwo_header_log
+    def prepare_directories(self, proposal_info):
+        HWR.beamline.lims.lims_rest.vuo_client.create_user_invest_from_prop(
+            self.tag, self.proposal_number, inv_name=self.get_investigation())
 
     @hwo_header_log
     def get_base_data_directory(self):
