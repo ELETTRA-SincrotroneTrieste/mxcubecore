@@ -63,7 +63,6 @@ class VUOClient(HardwareObject):
         except AttributeError:
             self.log.warning("Base result url not set in the configuration file")
 
-    @hwo_header_log
     def authenticate(self, user, password):
         """
         Authenticate with RESTfull services, updates the authentication token,
