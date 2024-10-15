@@ -673,6 +673,9 @@ class ISPyBAPIClient(HardwareObject):
                                f"ISPyB")
             return
 
+    def is_manual_sample(self, sample_info):
+        return sample_info['lims_location'] == '0:00'
+
     @hwo_header_log
     def get_session_samples(self, session_id, sample_name=None, acronym=None,
                             sql_session: DBSession = None):
