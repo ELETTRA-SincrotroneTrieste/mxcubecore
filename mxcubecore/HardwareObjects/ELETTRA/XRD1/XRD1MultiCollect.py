@@ -72,7 +72,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
 
         self.setControlObjects(
             diffractometer=HWR.beamline.diffractometer,
-            sample_changer=HWR.beamline.sample_changer,
+            sample_changer=None,
             lims=HWR.beamline.lims,
             safety_shutter=HWR.beamline.safety_shutter,
             machine_current=HWR.beamline.machine_info,
@@ -160,11 +160,10 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         exp_time = float(data_collect_parameters['oscillation_sequence'][0]['exposure_time'])
         num_imgs = float(data_collect_parameters['oscillation_sequence'][0]['number_of_images'])
         total_acq_time = exp_time * num_imgs
-        offset = 10
+        offset = 60  # [sec]
         with gevent.Timeout(total_acq_time + offset,
-                            TimeoutError(f"Timed out. The datacollection "
-                                         f"\"{self.username}\" took too much time to "
-                                         f"end (more than the total exposure: "
+                            TimeoutError(f"Timed out. The datacollection took too much"
+                                         f" time to end (more than the total exposure: "
                                          f"{total_acq_time} sec)")):
             while True:
                 try:
@@ -426,7 +425,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
 
         return self.actual_frame_num
 
-    @hwo_header_log()
+    @hwo_header_log
     def stop_acquisition(self):
 
         self.cmd_abort()
