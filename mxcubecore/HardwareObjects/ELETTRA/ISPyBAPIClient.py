@@ -48,6 +48,7 @@ import sqlalchemy.orm
 from sqlalchemy import create_engine, update
 from sqlalchemy.orm import sessionmaker, joinedload
 from sqlalchemy.orm import Session as DBSession
+from sqlalchemy.sql.expression import func
 
 from mxcubecore.BaseHardwareObjects import HardwareObject
 from mxcubecore import HardwareRepository as HWR
@@ -596,6 +597,19 @@ class ISPyBAPIClient(HardwareObject):
                 .filter(Protein.acronym == acronym) \
                 .first()
         return db_protein
+
+    @hwo_header_log
+    def get_last_dc_run_number(self, image_prefix, sql_session: DBSession = None):
+        session_id = int(HWR.beamline.session.session_id)
+        img_prefix_regex = f"^(ref-)?{image_prefix}(_wedge-.+)?$"
+        if not sql_session:
+            sql_session: DBSession = next(self.get_db_session())
+        last_run_number = \
+            sql_session.query(func.max(DataCollection.dataCollectionNumber)) \
+                .filter(DataCollection.SESSIONID == session_id) \
+                .filter(DataCollection.imagePrefix.regexp_match(img_prefix_regex)) \
+                .scalar()
+        return last_run_number if last_run_number else 0
 
     @hwo_header_log
     def get_samples(self, proposal_id, session_id):
