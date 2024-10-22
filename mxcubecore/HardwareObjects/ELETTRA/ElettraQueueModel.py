@@ -115,10 +115,12 @@ class ElettraQueueModel(HardwareObject):
         :rtype: NoneType
         """
         self._models[name] = queue_model_objects.RootNode()
+        self._models[name]._node_id = 0
 
         if not name:
             for name in self._models.keys():
                 self._models[name] = queue_model_objects.RootNode()
+                self._models[name]._node_id = 0
 
         HWR.beamline.queue_manager.clear()
 
