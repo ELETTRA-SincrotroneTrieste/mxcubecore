@@ -314,59 +314,16 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
     @hwo_header_log
     def populate_dc_params_with_sample_info(self, data_collect_parameters):
 
-        # TODO move this part to the queue system if possible
-
         queue_sample: Sample = HWR.beamline.queue_manager.get_current_entry() \
             .get_data_model().get_sample_node()
 
-        '''
-        print("+++++++++++++++ queue_sample")
-        print(queue_sample.__dict__)
-        print(queue_sample)
-        print(queue_sample.crystals)
-        '''
-
         sample_name = queue_sample.get_name()
         crystal: Crystal = queue_sample.crystals[0]
-        sample_location = 0
-
-        proposal_number = HWR.beamline.session.proposal_number
-        proposal_code = HWR.beamline.session.proposal_code
-        proposal_info_dict = HWR.beamline.lims.get_proposal(proposal_code,
-                                                            int(proposal_number))
-        proposal_id = proposal_info_dict['Proposal']['proposalId']
-
-        # Check if the sample already exists for this proposal
-        # (otherwise create a new one)
-        db_samples = HWR.beamline.lims.get_session_samples(
-            data_collect_parameters["sessionId"], sample_name=sample_name,
-            acronym=crystal.protein_acronym)
-
-        # TODO move this part ISPyBAPIClient
-        if not db_samples:
-            # Check if the protein already exists for this proposal
-            # (otherwise create a new one)
-            db_protein = HWR.beamline.lims.get_protein(proposal_id,
-                                                       crystal.protein_acronym)
-            if db_protein is None:
-                protein_dict = {'acronym': crystal.protein_acronym,
-                                'proposalId': proposal_id}
-                db_protein = HWR.beamline.lims._insert_protein(protein_dict)
-                self.log.info(f"New crystal [acronym:{crystal.protein_acronym}]"
-                              f" created")
-            crystal_dict = {'proteinId': db_protein.proteinId}
-            db_crystal = HWR.beamline.lims._insert_crystal(crystal_dict)
-            sample_dict = {'name': sample_name, 'location': sample_location,
-                           'crystalId': db_crystal.crystalId}
-            db_sample = HWR.beamline.lims._insert_sample(sample_dict)
-            self.log.info(f"Sample [name:{sample_name} - "
-                          f"acronym:{crystal.protein_acronym}] created")
-        else:
-            db_sample = db_samples[0]
-            self.log.debug(f"Sample [name:{sample_name} - "
-                           f"acronym:{crystal.protein_acronym}] already exists")
-        data_collect_parameters['sample_reference']['blSampleId'] = \
-            db_sample.blSampleId
+        acronym = crystal.protein_acronym
+        session_id = data_collect_parameters['sessionId']
+        sample_id = HWR.beamline.lims.add_manual_session_sample(session_id, sample_name,
+                                                                acronym)
+        data_collect_parameters['sample_reference']['blSampleId'] = sample_id
 
         '''
         queue_sample.lims_id = db_sample.blSampleId

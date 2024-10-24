@@ -31,16 +31,10 @@ from ispyb.sqlalchemy import DataCollection, DataCollectionGroup, Position, \
     MotorPosition, GridInfo, Proposal, BLSession, Person, SessionHasPerson, BLSample,\
     Protein, Crystal
 
-ISPyB_sp_v3 = True
-if ISPyB_sp_v3:
-    import ispyb
-    import ispyb.sqlalchemy
-    from ispyb.connector.mysqlsp.main import ISPyBMySQLSPConnector
-    from ispyb.sp.mxacquisition import MXAcquisition
-else:
-    import sys
-    sys.path.append("/home/alessandro/devel/projects/mxcube/mxcube_local/ispyb-api")
-    import ispyb
+import ispyb
+import ispyb.sqlalchemy
+from ispyb.connector.mysqlsp.main import ISPyBMySQLSPConnector
+from ispyb.sp.mxacquisition import MXAcquisition
 
 import mysql.connector
 from sqlalchemy.exc import SQLAlchemyError
@@ -613,16 +607,23 @@ class ISPyBAPIClient(HardwareObject):
 
     @hwo_header_log
     def get_samples(self, proposal_id, session_id):
+
+        if session_id is None:
+            session_id = HWR.beamline.session.session_id
+
         samples_list = []
         try:
             with self.SqlAlchemySession() as sql_session:
                 sql_session: DBSession
-                db_samples: typing.List[BLSample] = \
-                    sql_session.query(BLSample) \
-                        .join(Crystal) \
-                        .join(Protein) \
-                        .filter(Protein.proposalId == proposal_id) \
-                        .all()
+                query = sql_session.query(BLSample) \
+                    .join(Crystal) \
+                    .join(Protein) \
+                    .join(DataCollection,
+                          BLSample.blSampleId == DataCollection.BLSAMPLEID) \
+                    .filter(Protein.proposalId == proposal_id)
+                if session_id:
+                    query.filter(DataCollection.SESSIONID == session_id)
+                db_samples: typing.List[BLSample] = query.all()
                 for db_sample in db_samples:
                     db_dcg: DataCollectionGroup = \
                         sql_session.query(DataCollectionGroup) \
@@ -687,6 +688,7 @@ class ISPyBAPIClient(HardwareObject):
                                f"ISPyB")
             return
 
+    @hwo_header_log
     def is_manual_sample(self, sample_info):
         return sample_info['lims_location'] == '0:00'
 
@@ -708,6 +710,43 @@ class ISPyBAPIClient(HardwareObject):
                 .filter(Protein.acronym == acronym)
         db_samples: list[BLSample] = db_query.all()
         return db_samples
+
+    @hwo_header_log
+    def add_manual_session_sample(self, session_id, sample_name, protein_acronym):
+
+        # Check if the sample already exists for this session
+        # (otherwise create a new one)
+        db_samples = self.get_session_samples(
+            session_id, sample_name=sample_name,
+            acronym=protein_acronym)
+
+        if not db_samples:
+            db_session: BLSession = self.get_session_by_id(session_id)
+            proposal_id = db_session.proposalId
+
+            # Check if the protein already exists for this proposal
+            # (otherwise create a new one)
+            db_protein = self.get_protein(proposal_id, protein_acronym)
+            if db_protein is None:
+                protein_dict = {'acronym': protein_acronym,
+                                'proposalId': proposal_id}
+                db_protein = self._insert_protein(protein_dict)
+                self.log.info(f"New crystal [acronym:{protein_acronym}]"
+                              f" created")
+            crystal_dict = {'proteinId': db_protein.proteinId}
+            db_crystal = self._insert_crystal(crystal_dict)
+            # Location of Manual sample is 0 (here in Elettra)
+            sample_dict = {'name': sample_name, 'location': 0,
+                           'crystalId': db_crystal.crystalId}
+            db_sample = self._insert_sample(sample_dict)
+            self.log.info(f"Sample [name:{sample_name} - "
+                          f"acronym:{protein_acronym}] created")
+        else:
+            db_sample = db_samples[0]
+            self.log.debug(f"Sample [name:{sample_name} - "
+                           f"acronym:{protein_acronym}] already exists")
+
+        return db_sample.blSampleId
 
     @hwo_header_log
     def get_session_local_contact(self, session_id):
