@@ -70,8 +70,6 @@ class XRD1DetectorPilatus(AbstractDetector):
         self.connect(self.ch_state, "update", lambda state: self.update_state(
             self.map_to_mxcube_state.get(state, self.STATES.UNKNOWN)))
 
-        self.update_state()
-
     @hwo_header_log
     def get_state(self):
 
