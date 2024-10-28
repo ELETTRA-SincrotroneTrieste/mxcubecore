@@ -54,7 +54,7 @@ class XRD1ZoomBZoom(AbstractNState):
         self.connect(self.ch_camera_zoom_level, 'update',
                      lambda tango_val: self.update_value(self.value_to_enum(tango_val)))
 
-        self.update_limits((1, len(self.VALUES) - 1))
+        self.update_limits((0, len(self.VALUES)))
         self.update_state(self.STATES.READY)
 
     @hwo_header_log
