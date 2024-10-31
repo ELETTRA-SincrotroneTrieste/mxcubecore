@@ -50,6 +50,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         self.ready_event = None
         self.actual_frame_num = 0
         self.ch_acq_mode = None
+        self.ch_continuous_daq = None
         self.ch_start_phi = None
         self.ch_delta_phi = None
         self.ch_exposure_time = None
@@ -88,6 +89,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         )
 
         self.ch_acq_mode = self.get_channel_object("acq_mode", optional=False)
+        self.ch_continuous_daq = self.get_channel_object("continuous_daq", optional=False)
         self.ch_start_phi = self.get_channel_object("start_phi", optional=False)
         self.ch_delta_phi = self.get_channel_object("delta_phi", optional=False)
         self.ch_exposure_time = self.get_channel_object("exposure_time",
@@ -178,9 +180,6 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
                 self.emit('collectImageTaken', num)
                 gevent.sleep(self.ch_state.polling / 1000)
 
-
-        print(f"QUEUE --- id: {sample_id}")
-
         data_collect_parameters["collection_end_time"] = time.strftime(
             "%Y-%m-%d %H:%M:%S")
 
@@ -217,6 +216,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
                        f"dataset {investigation}/{experiment}/{dataset}")
 
         self.ch_acq_mode.set_value(2)  # Default ACQ_CONTINUOUS
+        self.ch_continuous_daq.set_value(True)
         self.ch_start_phi.set_value(
             data_collect_parameters['oscillation_sequence'][0]['start'])
         self.ch_delta_phi.set_value(
