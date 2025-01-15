@@ -123,15 +123,19 @@ class ElettraSession(HardwareObject):
     @hwo_header_log
     def get_investigation(self):
 
-        if self.proposal_number and self.visit_num:
+        if self.proposal_number and self.visit_num is not None:
             return f"{self.proposal_number}-{self.visit_num}"
         else:
-            raise ValueError
+            raise ValueError("\"Proposal number\" or \"visit number\" undefined")
 
     @hwo_header_log
     def prepare_directories(self, proposal_info):
-        HWR.beamline.lims.lims_rest.vuo_client.create_user_invest_from_prop(
-            self.tag, self.proposal_number, inv_name=self.get_investigation())
+        try:
+            HWR.beamline.lims.lims_rest.vuo_client.get_user_experiments(self.tag, self.get_investigation())
+            self.log.info(f"Investigation \"{self.get_investigation()}\" already exists in VUO")
+        except:
+            HWR.beamline.lims.lims_rest.vuo_client.create_user_invest_from_prop(self.tag, self.proposal_number, inv_name=self.get_investigation())
+            self.log.info(f"Investigation \"{self.get_investigation()}\" created in VUO")
 
     @hwo_header_log
     def get_base_data_directory(self):

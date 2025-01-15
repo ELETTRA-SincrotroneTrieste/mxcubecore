@@ -92,17 +92,14 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         self.ch_continuous_daq = self.get_channel_object("continuous_daq", optional=False)
         self.ch_start_phi = self.get_channel_object("start_phi", optional=False)
         self.ch_delta_phi = self.get_channel_object("delta_phi", optional=False)
-        self.ch_exposure_time = self.get_channel_object("exposure_time",
-                                                        optional=False)
+        self.ch_exposure_time = self.get_channel_object("exposure_time", optional=False)
         self.ch_total_frames = self.get_channel_object("total_frames", optional=False)
         self.ch_start_frame = self.get_channel_object("start_frame", optional=False)
         self.ch_file_root = self.get_channel_object("file_root", optional=False)
         self.ch_run_number = self.get_channel_object("run_number", optional=False, )
-        self.ch_file_cbf_selected = self.get_channel_object("file_cbf_selected",
-                                                            optional=False)
+        self.ch_file_cbf_selected = self.get_channel_object("file_cbf_selected", optional=False)
         self.ch_sub_dir = self.get_channel_object("sub_dir", optional=False)
-        self.ch_forced_investigation = self.get_channel_object("forced_investigation",
-                                                               optional=False)
+        self.ch_forced_investigation = self.get_channel_object("forced_investigation", optional=False)
         self.ch_detector_distance_mm = self.get_channel_object("detector_distance_mm",
                                                                optional=False)
         self.ch_state = self.get_channel_object("state", optional=False)
@@ -115,8 +112,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
     @hwo_header_log
     def do_collect(self, owner, data_collect_parameters):
 
-        data_collect_parameters["collection_start_time"] = \
-            time.strftime("%Y-%m-%d %H:%M:%S")
+        data_collect_parameters["collection_start_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
 
         # Reset collection id on each data collect
         self.collection_id = None
@@ -140,10 +136,9 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
 
         self.populate_dc_params_with_centring_info(data_collect_parameters)
 
-        print(f"current lims sample: {self.current_lims_sample}")
+        #print(f"current lims sample: {self.current_lims_sample}")
 
-        sample_id, sample_location, sample_code = \
-            self.get_sample_info_from_parameters(data_collect_parameters)
+        sample_id, sample_location, sample_code = self.get_sample_info_from_parameters(data_collect_parameters)
 
         try:
             self.log.info("Storing data collection metadata in to LIMS")
@@ -154,8 +149,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
             self.user_log.info("Data collection metadata stored in LIMS")
         except Exception:
             self.log.exception("Failed to store data collection metadata in to LIMS")
-            self.user_log.exception(
-                "Failed to store data collection metadata in to LIMS")
+            self.user_log.exception("Failed to store data collection metadata in to LIMS")
 
         self.cmd_start()
         t_start = time.time()
@@ -180,8 +174,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
                 self.emit('collectImageTaken', num)
                 gevent.sleep(self.ch_state.polling / 1000)
 
-        data_collect_parameters["collection_end_time"] = time.strftime(
-            "%Y-%m-%d %H:%M:%S")
+        data_collect_parameters["collection_end_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
 
     @task
     @hwo_header_log
@@ -217,16 +210,11 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
 
         self.ch_acq_mode.set_value(2)  # Default ACQ_CONTINUOUS
         self.ch_continuous_daq.set_value(True)
-        self.ch_start_phi.set_value(
-            data_collect_parameters['oscillation_sequence'][0]['start'])
-        self.ch_delta_phi.set_value(
-            data_collect_parameters['oscillation_sequence'][0]['range'])
-        self.ch_exposure_time.set_value(data_collect_parameters['oscillation_sequence']
-                                        [0]['exposure_time'])
-        self.ch_total_frames.set_value(data_collect_parameters['oscillation_sequence']
-                                       [0]['number_of_images'])
-        self.ch_start_frame.set_value(data_collect_parameters['oscillation_sequence']
-                                      [0]['start_image_number'])
+        self.ch_start_phi.set_value(data_collect_parameters['oscillation_sequence'][0]['start'])
+        self.ch_delta_phi.set_value(data_collect_parameters['oscillation_sequence'][0]['range'])
+        self.ch_exposure_time.set_value(data_collect_parameters['oscillation_sequence'][0]['exposure_time'])
+        self.ch_total_frames.set_value(data_collect_parameters['oscillation_sequence'][0]['number_of_images'])
+        self.ch_start_frame.set_value(data_collect_parameters['oscillation_sequence'][0]['start_image_number'])
         self.ch_forced_investigation.set_value(investigation)
         self.ch_sub_dir.set_value(experiment)
         self.ch_run_number.set_value(dataset)
@@ -314,15 +302,13 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
     @hwo_header_log
     def populate_dc_params_with_sample_info(self, data_collect_parameters):
 
-        queue_sample: Sample = HWR.beamline.queue_manager.get_current_entry() \
-            .get_data_model().get_sample_node()
+        queue_sample: Sample = HWR.beamline.queue_manager.get_current_entry().get_data_model().get_sample_node()
 
         sample_name = queue_sample.get_name()
         crystal: Crystal = queue_sample.crystals[0]
         acronym = crystal.protein_acronym
         session_id = data_collect_parameters['sessionId']
-        sample_id = HWR.beamline.lims.add_manual_session_sample(session_id, sample_name,
-                                                                acronym)
+        sample_id = HWR.beamline.lims.add_manual_session_sample(session_id, sample_name, acronym)
         data_collect_parameters['sample_reference']['blSampleId'] = sample_id
 
         '''
