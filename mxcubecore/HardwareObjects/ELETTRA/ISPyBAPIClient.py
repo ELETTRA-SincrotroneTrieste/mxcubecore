@@ -622,7 +622,7 @@ class ISPyBAPIClient(HardwareObject):
                           BLSample.blSampleId == DataCollection.BLSAMPLEID) \
                     .filter(Protein.proposalId == proposal_id)
                 if session_id:
-                    query.filter(DataCollection.SESSIONID == session_id)
+                    query = query.filter(DataCollection.SESSIONID == session_id)
                 db_samples: typing.List[BLSample] = query.all()
                 for db_sample in db_samples:
                     db_dcg: DataCollectionGroup = \
