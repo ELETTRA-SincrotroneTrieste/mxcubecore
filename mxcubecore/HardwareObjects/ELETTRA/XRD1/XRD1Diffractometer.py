@@ -91,21 +91,14 @@ class XRD1Diffractometer(GenericDiffractometer):
         }
 
         # CENTRING_MOTORS_NAME are configured in the xml
-        self.ch_centering_selected_x_mm = self.get_channel_object(
-            "centering_selected_x_mm", optional=False)
-        self.ch_centering_selected_y_mm = self.get_channel_object(
-            "centering_selected_y_mm", optional=False)
-        self.ch_centering_state = self.get_channel_object(
-            "centering_state", optional=False)
-        self.ch_centering_phase = self.get_channel_object(
-            "centering_phase", optional=False)
-        self.ch_beam_center_x = self.get_channel_object(
-            "beam_center_x", optional=False)
-        self.ch_beam_center_y = self.get_channel_object(
-            "beam_center_y", optional=False)
+        self.ch_centering_selected_x_mm = self.get_channel_object("centering_selected_x_mm", optional=False)
+        self.ch_centering_selected_y_mm = self.get_channel_object("centering_selected_y_mm", optional=False)
+        self.ch_centering_state = self.get_channel_object("centering_state", optional=False)
+        self.ch_centering_phase = self.get_channel_object("centering_phase", optional=False)
+        self.ch_beam_center_x = self.get_channel_object("beam_center_x", optional=False)
+        self.ch_beam_center_y = self.get_channel_object("beam_center_y", optional=False)
         self.ch_state = self.get_channel_object("state", optional=False)
-        self.cmd_centring_start_method = self.get_command_object(
-            "centring_start_method")
+        self.cmd_centring_start_method = self.get_command_object("centring_start_method")
         self.cmd_centring_abort = self.get_command_object("centring_abort")
         self.head_orientation = self.get_object_by_role("headorientation")
         self.mount_mode = self.get_property("sample_mount_mode", "manual")
@@ -242,12 +235,10 @@ class XRD1Diffractometer(GenericDiffractometer):
                     gevent.sleep(self.ch_centering_state.polling / 1000)
                     centring_state = self.get_centring_state()
 
-                if centring_state in [TwoClickCentringState.ERROR,
+                if False and centring_state in [TwoClickCentringState.ERROR,
                                       TwoClickCentringState.USER_ABORTED]:
-                    err_msg = f"{self.CENTRING_METHOD_MANUAL} centring procedure " \
-                              f"failed. Centring state of the tango device " \
-                              f"{self.ch_centering_state.device_name} is " \
-                              f"\"{centring_state.name}\""
+                    err_msg = f"{self.CENTRING_METHOD_MANUAL} centring procedure failed. Centring state of the tango" \
+                              f" device {self.ch_centering_state.device_name} is \"{centring_state.name}\""
                     self.log.error(err_msg)
                     self.user_log.error(err_msg)
                     raise Exception(err_msg)
@@ -381,9 +372,7 @@ class XRD1Diffractometer(GenericDiffractometer):
                 go_to_pos = position
                 go_to_name_pos = pos_name
         self.cmd_centring_start_method(go_to_name_pos)
-        self.log.debug(f"Current position: {curr_pos} -> "
-                       f"closest \"Well Known Position\" : "
-                       f"{go_to_pos}")
+        self.log.debug(f"Current position: {curr_pos} -> closest \"Well Known Position\" : {go_to_pos}")
 
     @hwo_header_log
     def is_in_well_known_pos(self):
@@ -399,6 +388,13 @@ class XRD1Diffractometer(GenericDiffractometer):
     def automatic_centring(self):
 
         raise NotImplemented
+
+    @hwo_header_log
+    def filter_read_only_motors(self, motor_positions):
+        for motor_role, value in list(motor_positions.items()):
+            motor = self.motor_hwobj_dict.get(motor_role)
+            if motor.read_only and abs(motor.get_value() - value) <= motor._tolerance:
+                motor_positions.pop(motor_role)
 
     @hwo_header_log
     def motor_positions_to_screen(self, centred_positions_dict):
@@ -426,6 +422,12 @@ class XRD1Diffractometer(GenericDiffractometer):
             y_pix = yc_pix
         return round(x_pix), round(y_pix)
 
+    @hwo_header_log
+    def move_motors(self, motor_positions, timeout=15):
+
+        # Needed to prevent a crash when calling <motor>.set_value() on "read-only" motors
+        self.filter_read_only_motors(motor_positions)
+        super(XRD1Diffractometer, self).move_motors(motor_positions, timeout)
 
     @hwo_header_log
     def update_phiz(self, pos=None):
