@@ -70,6 +70,19 @@ class XRD1DetectorPilatus(AbstractDetector):
         self.connect(self.ch_state, "update", lambda state: self.update_state(
             self.map_to_mxcube_state.get(state, self.STATES.UNKNOWN)))
 
+    def get_image_file_name(self, path_template, suffix=None):
+        template = "%s_%s_%%" + str(path_template.precision) + "d.%s"
+
+        suffix = suffix or path_template.suffix
+        file_name = template % (path_template.get_prefix(),
+                                path_template.run_number,
+                                suffix
+        )
+        if path_template.compression:
+            file_name = "%s.gz" % file_name
+
+        return file_name
+
     @hwo_header_log
     def get_state(self):
 

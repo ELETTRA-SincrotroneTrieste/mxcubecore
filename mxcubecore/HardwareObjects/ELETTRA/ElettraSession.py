@@ -61,7 +61,7 @@ class ElettraSession(HardwareObject):
         self.base_process_directory = None
         self.base_archive_directory = None
         self.prefix_folder_name = None
-        self.raw_data_folder_name = None
+        self.rawdata_folder_name = None
         self.processed_data_folder_name = None
         self.archived_data_folder = None
 
@@ -78,12 +78,9 @@ class ElettraSession(HardwareObject):
         self.template = self["file_info"].get_property("file_template")
 
         self.base_directory = self["file_info"].get_property("base_directory").strip()
-        self.prefix_folder_name = \
-            self["file_info"].get_property("prefix_folder_name", "").strip()
-        self.raw_data_folder_name = \
-            self["file_info"].get_property("raw_data_folder_name").strip()
-        self.processed_data_folder_name = \
-            self["file_info"].get_property("processed_data_folder_name").strip()
+        self.prefix_folder_name = self["file_info"].get_property("prefix_folder_name", "").strip()
+        self.rawdata_folder_name = self["file_info"].get_property("raw_data_folder_name").strip()
+        self.processed_data_folder_name = self["file_info"].get_property("processed_data_folder_name").strip()
 
         # Archive is on tape library (not directly reachable)
         self.archived_data_folder = ""
@@ -98,8 +95,7 @@ class ElettraSession(HardwareObject):
             except (TypeError, IndexError):
                 pass
 
-        precision = int(self["file_info"].get_property("precision",
-                                                       self.default_precision))
+        precision = "0" + str(self["file_info"].get_property("precision", self.default_precision))
 
         # Init PathTemplate
         PathTemplate.set_data_base_path(self.base_directory)
@@ -119,6 +115,13 @@ class ElettraSession(HardwareObject):
         self.visit_num = db_session.visit_number
 
         self._session_id = sess_id
+
+    @property
+    def raw_data_folder_name(self):
+        # It returns the investigation instead of "rawdata_folder_name" attribute because in
+        # mxcubeweb.core.components.queue there are splits over raw_data_folder_name in order to get the subdir
+        # it is based on ESRF? path template
+        return self.get_investigation()
 
     @hwo_header_log
     def get_investigation(self):
@@ -189,26 +192,11 @@ class ElettraSession(HardwareObject):
         """
 
         directory = self.get_base_data_directory()
-
         if sub_dir:
+            # subdir can be "test" or "test/[RUN#]/rawdata"
+            sub_dir = sub_dir.replace(f'/{self.prefix_folder_name}/{self.rawdata_folder_name}', '')
             sub_dir = sub_dir.replace(" ", "").replace(":", "-")
-            directory = os.path.join(directory, sub_dir)
-
-            '''
-            # Get the next run number
-            run_numbers = [0]
-            for path_templates in HWR.beamline.queue_model.get_path_templates():
-                for pt in path_templates:
-                    if isinstance(pt, PathTemplate):
-                        # Checked because it can be something different e.g. DataCollection
-                        pt: PathTemplate
-                        if pt.directory.startswith(directory):
-                            run_numbers.append(pt.run_number)
-            run_number = str(max(run_numbers) + 1)
-            '''
-
-            directory = os.path.join(directory, self.prefix_folder_name,
-                                     self.raw_data_folder_name)
+            directory = os.path.join(directory, sub_dir, self.prefix_folder_name, self.rawdata_folder_name)
         return directory
 
     @hwo_header_log
@@ -222,12 +210,10 @@ class ElettraSession(HardwareObject):
         :returns: The full path to processed data.
         """
         directory = self.get_base_process_directory()
-
         if sub_dir:
+            sub_dir = sub_dir.replace(f'/{self.prefix_folder_name}/{self.processed_data_folder_name}', '')
             sub_dir = sub_dir.replace(" ", "").replace(":", "-")
-            directory = os.path.join(directory, sub_dir, self.prefix_folder_name,
-                                     self.processed_data_folder_name)
-
+            directory = os.path.join(directory, sub_dir, self.prefix_folder_name, self.processed_data_folder_name)
         return directory
 
     @hwo_header_log
