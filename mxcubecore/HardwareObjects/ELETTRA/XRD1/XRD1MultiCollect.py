@@ -112,69 +112,66 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
     @hwo_header_log
     def do_collect(self, owner, data_collect_parameters):
 
-        data_collect_parameters["collection_start_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
-
-        # Reset collection id on each data collect
-        self.collection_id = None
-
-        self.prepare_collection(data_collect_parameters)
-
-        # Tango xrd1/dac/collect (executer)
-        self.setup_collect_tango_executer(data_collect_parameters)
-
-        # Handle manual sample
-        if data_collect_parameters['sample_reference']['blSampleId'] == -1:
-            # Check if there is a sample with the same name and acronym in
-            # the ISPyB database, if it doesn't exist a new one will be created
-            # In any case the "data_collect_parameters" will be updated with the
-            # sample_id
-            self.populate_dc_params_with_sample_info(data_collect_parameters)
-
-        self.populate_dc_params_with_beamline_info(data_collect_parameters)
-
-        self.populate_dc_params_with_osc_info(data_collect_parameters)
-
-        self.populate_dc_params_with_centring_info(data_collect_parameters)
-
-        #print(f"current lims sample: {self.current_lims_sample}")
-
-        sample_id, sample_location, sample_code = self.get_sample_info_from_parameters(data_collect_parameters)
-
         try:
-            self.log.info("Storing data collection metadata in to LIMS")
+            data_collect_parameters["collection_start_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
+
+            # Create new datacollection in ISPyB
+            self.collection_id, detector_id = HWR.beamline.lims.store_data_collection(data_collect_parameters)
+            self.user_log.info("Data collection parameters stored in ISPyB")
+
+            # Setup tango device
+            self.prepare_collection(data_collect_parameters)
+
+            # Handle manual sample
+            if data_collect_parameters['sample_reference']['blSampleId'] == -1:
+                # Check if there is a sample with the same name and acronym in
+                # the ISPyB database, if it doesn't exist a new one will be created
+                # In any case the "data_collect_parameters" will be updated with the
+                # sample_id
+                self.populate_dc_params_with_sample_info(data_collect_parameters)
+                self.user_log.info("Manual sample stored in ISPyB")
+
+            # Populate data_collect_parameters
+            self.populate_dc_params_with_beamline_info(data_collect_parameters)
+            self.populate_dc_params_with_centring_info(data_collect_parameters)
+            self.populate_dc_params_with_other_info(data_collect_parameters)
+            sample_id, sample_location, sample_code = self.get_sample_info_from_parameters(data_collect_parameters)
             data_collect_parameters["blSampleId"] = sample_id
-            self.collection_id, detector_id = HWR.beamline.lims.store_data_collection(
-                data_collect_parameters, wait=True)
-            data_collect_parameters["collection_id"] = self.collection_id
-            self.user_log.info("Data collection metadata stored in LIMS")
-        except Exception:
-            self.log.exception("Failed to store data collection metadata in to LIMS")
-            self.user_log.exception("Failed to store data collection metadata in to LIMS")
+            self.log.info(f"Data collection parameters:"
+                          f"\n{json.dumps(data_collect_parameters, indent=3, default=lambda obj: repr(obj))}")
 
-        self.cmd_start()
-        t_start = time.time()
-        exp_time = float(data_collect_parameters['oscillation_sequence'][0]['exposure_time'])
-        num_imgs = float(data_collect_parameters['oscillation_sequence'][0]['number_of_images'])
-        total_acq_time = exp_time * num_imgs
-        offset = 60  # [sec]
-        with gevent.Timeout(total_acq_time + offset,
-                            TimeoutError(f"Timed out. The datacollection took too much"
-                                         f" time to end (more than the total exposure: "
-                                         f"{total_acq_time} sec)")):
-            while True:
-                try:
-                    if self.ch_state.get_value() in [PyTango.DevState.OFF,
-                                                     PyTango.DevState.FAULT]:
-                        break
-                except PyTango.DevFailed.timeout:
-                    pass
+            # Update datacollection in ISPyB
+            HWR.beamline.lims.update_data_collection(data_collect_parameters, wait=True)
+            self.user_log.info("Data collection parameters updated in ISPyB")
 
-                elapsed_time = min(time.time() - t_start, total_acq_time)
-                num = int(num_imgs * (elapsed_time/total_acq_time))
-                self.emit('collectImageTaken', num)
-                gevent.sleep(self.ch_state.polling / 1000)
-
-        data_collect_parameters["collection_end_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            # Start actual data collection
+            self.cmd_start()
+            self.user_log.info(f"Data collection launched (executer '{self.ch_start_phi.device_name}' is ON)")
+            t_start = time.time()
+            exp_time = float(data_collect_parameters['oscillation_sequence'][0]['exposure_time'])
+            num_imgs = float(data_collect_parameters['oscillation_sequence'][0]['number_of_images'])
+            total_acq_time = exp_time * num_imgs
+            offset = 60  # [sec]
+            with gevent.Timeout(total_acq_time + offset,
+                                TimeoutError(f"Timed out. The datacollection took too much"
+                                             f" time to end (more than the total exposure: "
+                                             f"{total_acq_time} sec)")):
+                while True:
+                    try:
+                        if self.ch_state.get_value() in [PyTango.DevState.OFF, PyTango.DevState.FAULT]:
+                            break
+                    except PyTango.DevFailed.timeout:
+                        pass
+                    elapsed_time = min(time.time() - t_start, total_acq_time)
+                    num = int(num_imgs * (elapsed_time/total_acq_time))
+                    self.emit('collectImageTaken', num)
+                    gevent.sleep(self.ch_state.polling / 1000)
+                self.user_log.info(f"Data collection finished (executer '{self.ch_start_phi.device_name}'"
+                                   f" is {self.ch_state.get_value()})")
+            data_collect_parameters["collection_end_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception as exc:
+            data_collect_parameters["comment"] = f"Data collection failed: {str(exc)}"
+            raise exc
 
     @task
     @hwo_header_log
@@ -234,61 +231,49 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
     @hwo_header_log
     def populate_dc_params_with_centring_info(self, data_collect_parameters):
 
-        self.user_log.info("Getting centring status")
-        centring_status = self.bl_control.diffractometer.get_centring_status()
-
-        print(f"centring_info: {centring_status}")
-
         # Save sample centring positions
+        centring_status = self.bl_control.diffractometer.get_centring_status()
         motors_to_move_before_collect = data_collect_parameters.setdefault("motors", {})
-
         for motor, pos in centring_status.get("motors", {}).items():
             if motor in motors_to_move_before_collect:
                 continue
             motors_to_move_before_collect[motor] = pos
-
-        print(f"motors_to_move_before_collect: {motors_to_move_before_collect}")
-
         current_diffract_pos = self.bl_control.diffractometer.get_positions()
-
-        print(f"current_diffract_pos: {current_diffract_pos}")
         positions_str = ""
         for motor, pos in motors_to_move_before_collect.items():
             if pos is not None and motor is not None:
                 positions_str += f"{motor}={pos} "
-
         data_collect_parameters["actualCenteringPosition"] = positions_str.strip()
-
-        try:
-            data_collect_parameters["centeringMethod"] = centring_status["method"]
-        except Exception:
-            data_collect_parameters["centeringMethod"] = None
-
-        print(type(data_collect_parameters))
-
-        print(f"data_collect_parameters DOPO: {data_collect_parameters}")
+        data_collect_parameters["centeringMethod"] = centring_status.get("method")
 
         # TODO evaluate whether retrieve data collection from DB
 
     @hwo_header_log
-    def populate_dc_params_with_osc_info(self, data_collect_parameters):
+    def populate_dc_params_with_other_info(self, data_collect_parameters):
 
         data_collect_parameters['oscillation_sequence'][0]['end'] = \
             data_collect_parameters['oscillation_sequence'][0]['start'] + \
             data_collect_parameters['oscillation_sequence'][0]['range']
         data_collect_parameters['rotation_axis'] = 'Phi'
 
+        run_num = data_collect_parameters['fileinfo']['run_number']
+        directory = data_collect_parameters['fileinfo']['directory'].\
+            replace(HWR.beamline.session.run_num_placeholder, str(run_num))
+        data_collect_parameters['fileinfo']['directory'] = directory
+
+        suffix = data_collect_parameters['fileinfo']['template']
+        precision = HWR.beamline.session.precision
+        suffix = suffix.replace("%" + ("%sd" % precision), int(precision) * "#")
+        data_collect_parameters['fileinfo']['template'] = suffix
+
     @hwo_header_log
     def populate_dc_params_with_beamline_info(self, data_collect_parameters):
-
-        self.user_log.info("Getting machine and beamline "
-                           "status information")
 
         data_collect_parameters["synchrotronMode"] = self.get_machine_fill_mode()
         data_collect_parameters["flux"] = self.get_flux()
         data_collect_parameters["wavelength"] = self.get_wavelength()
         data_collect_parameters["detectorDistance"] = self.get_detector_distance()
-        data_collect_parameters["resolution"] = self.get_resolution()
+        data_collect_parameters["resolution"] = {"upper": self.get_resolution()}
         data_collect_parameters["transmission"] = self.get_transmission()
         beam_centre_x, beam_centre_y = self.get_beam_centre()
         data_collect_parameters["xBeam"] = beam_centre_x
@@ -303,20 +288,12 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
     def populate_dc_params_with_sample_info(self, data_collect_parameters):
 
         queue_sample: Sample = HWR.beamline.queue_manager.get_current_entry().get_data_model().get_sample_node()
-
         sample_name = queue_sample.get_name()
         crystal: Crystal = queue_sample.crystals[0]
         acronym = crystal.protein_acronym
         session_id = data_collect_parameters['sessionId']
         sample_id = HWR.beamline.lims.add_manual_session_sample(session_id, sample_name, acronym)
         data_collect_parameters['sample_reference']['blSampleId'] = sample_id
-
-        '''
-        queue_sample.lims_id = db_sample.blSampleId
-        queue_sample: Sample = HWR.beamline.queue_manager.get_current_entry()\
-            .get_data_model().get_sample_node()
-        print(f"queue_sample.lims_id: {queue_sample.lims_id}")
-        '''
 
     @hwo_header_log
     def set_detector_filenames(
@@ -344,6 +321,8 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
             curr_kappa = float(self.bl_control.kappa.get_value())
             if curr_kappa != kappa:
                 self.bl_control.kappa.set_value(float(kappa))
+
+        self.setup_collect_tango_executer(data_collect_parameters)
 
     @hwo_header_log
     def prepare_oscillation(self, start, osc_range, exptime, npass):
@@ -414,7 +393,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
 
         file_suffix = None
         if self.bl_control.detector is not None:
-            file_suffix = self.bl_control.detector.get_property("fileSuffix")
+            file_suffix = self.bl_control.detector.file_suffix
         return file_suffix
 
     @hwo_header_log

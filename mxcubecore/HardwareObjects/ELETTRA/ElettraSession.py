@@ -60,7 +60,8 @@ class ElettraSession(HardwareObject):
         self.base_directory = None
         self.base_process_directory = None
         self.base_archive_directory = None
-        self.prefix_folder_name = None
+        self.precision = None
+        self.run_num_placeholder = None
         self.rawdata_folder_name = None
         self.processed_data_folder_name = None
         self.archived_data_folder = None
@@ -76,9 +77,9 @@ class ElettraSession(HardwareObject):
 
         self.suffix = self["file_info"].get_property("file_suffix")
         self.template = self["file_info"].get_property("file_template")
-
+        self.precision = "0" + str(self["file_info"].get_property("precision", self.default_precision))
         self.base_directory = self["file_info"].get_property("base_directory").strip()
-        self.prefix_folder_name = self["file_info"].get_property("prefix_folder_name", "").strip()
+        self.run_num_placeholder = self["file_info"].get_property("prefix_folder_name", "").strip()
         self.rawdata_folder_name = self["file_info"].get_property("raw_data_folder_name").strip()
         self.processed_data_folder_name = self["file_info"].get_property("processed_data_folder_name").strip()
 
@@ -95,11 +96,9 @@ class ElettraSession(HardwareObject):
             except (TypeError, IndexError):
                 pass
 
-        precision = "0" + str(self["file_info"].get_property("precision", self.default_precision))
-
         # Init PathTemplate
         PathTemplate.set_data_base_path(self.base_directory)
-        PathTemplate.set_precision(precision)
+        PathTemplate.set_precision(self.precision)
         PathTemplate.set_path_template_style(self.synchrotron_name, self.template)
         PathTemplate.set_archive_path(self.base_directory, self.archived_data_folder)
 
@@ -194,9 +193,9 @@ class ElettraSession(HardwareObject):
         directory = self.get_base_data_directory()
         if sub_dir:
             # subdir can be "test" or "test/[RUN#]/rawdata"
-            sub_dir = sub_dir.replace(f'/{self.prefix_folder_name}/{self.rawdata_folder_name}', '')
+            sub_dir = sub_dir.replace(f'/{self.run_num_placeholder}/{self.rawdata_folder_name}', '')
             sub_dir = sub_dir.replace(" ", "").replace(":", "-")
-            directory = os.path.join(directory, sub_dir, self.prefix_folder_name, self.rawdata_folder_name)
+            directory = os.path.join(directory, sub_dir, self.run_num_placeholder, self.rawdata_folder_name)
         return directory
 
     @hwo_header_log
@@ -211,9 +210,10 @@ class ElettraSession(HardwareObject):
         """
         directory = self.get_base_process_directory()
         if sub_dir:
-            sub_dir = sub_dir.replace(f'/{self.prefix_folder_name}/{self.processed_data_folder_name}', '')
+            # subdir can be "test" or "test/[RUN#]/rawdata"
+            sub_dir = sub_dir.replace(f'/{self.run_num_placeholder}/{self.processed_data_folder_name}', '')
             sub_dir = sub_dir.replace(" ", "").replace(":", "-")
-            directory = os.path.join(directory, sub_dir, self.prefix_folder_name, self.processed_data_folder_name)
+            directory = os.path.join(directory, sub_dir, self.run_num_placeholder, self.processed_data_folder_name)
         return directory
 
     @hwo_header_log

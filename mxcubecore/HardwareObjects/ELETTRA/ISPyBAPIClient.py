@@ -232,6 +232,8 @@ class ISPyBAPIClient(HardwareObject):
         """
 
         grid_info = {}
+        if mx_collection.get('grid_id'):
+            grid_info['gridInfoId'] = mx_collection['grid_id']
         if mx_collection.get('collection_grp_id'):
             grid_info['dataCollectionGroupId'] = mx_collection['collection_grp_id']
         if grid_dict.get('cell_width'):
@@ -370,8 +372,7 @@ class ISPyBAPIClient(HardwareObject):
         data_collection = {}
 
         if mx_collection.get('collection_grp_id'):
-            data_collection['dataCollectionGroupId'] = \
-                mx_collection['collection_grp_id']
+            data_collection['dataCollectionGroupId'] = mx_collection['collection_grp_id']
         if mx_collection.get('pos_id'):
             data_collection['POSITIONID'] = mx_collection['pos_id']
         if mx_collection.get('motor_pos_id'):
@@ -381,19 +382,18 @@ class ISPyBAPIClient(HardwareObject):
         if mx_collection.get('sessionId'):
             data_collection['SESSIONID'] = mx_collection['sessionId']
         if mx_collection.get('sample_reference'):
-            data_collection['BLSAMPLEID'] = \
-                mx_collection['sample_reference']['blSampleId']
+            data_collection['BLSAMPLEID'] = mx_collection['sample_reference']['blSampleId']
         if mx_collection.get('fileinfo'):
             if mx_collection['fileinfo'].get('directory'):
-                data_collection['imageDirectory'] = \
-                    mx_collection['fileinfo']['directory']
+                data_collection['imageDirectory'] = mx_collection['fileinfo']['directory']
             if mx_collection['fileinfo'].get('prefix'):
                 data_collection['imagePrefix'] = mx_collection['fileinfo']['prefix']
             if mx_collection['fileinfo'].get('suffix'):
                 data_collection['imageSuffix'] = mx_collection['fileinfo']['suffix']
             if mx_collection['fileinfo'].get('run_number'):
-                data_collection['dataCollectionNumber'] = \
-                    mx_collection['fileinfo']['run_number']
+                data_collection['dataCollectionNumber'] = mx_collection['fileinfo']['run_number']
+            if mx_collection['fileinfo'].get('template'):
+                data_collection['fileTemplate'] = mx_collection['fileinfo']['template']
         if mx_collection.get('wavelength'):
             data_collection['wavelength'] = mx_collection['wavelength']
         if mx_collection.get('collection_start_time'):
@@ -404,28 +404,22 @@ class ISPyBAPIClient(HardwareObject):
             data_collection['runStatus'] = mx_collection['status']
         if mx_collection.get('oscillation_sequence'):
             if mx_collection.get('oscillation_sequence')[0].get('number_of_images'):
-                data_collection['numberOfImages'] = \
-                    mx_collection['oscillation_sequence'][0]['number_of_images']
+                data_collection['numberOfImages'] = mx_collection['oscillation_sequence'][0]['number_of_images']
             if mx_collection.get('oscillation_sequence')[0].get('exposure_time'):
-                data_collection['exposureTime'] = \
-                    mx_collection['oscillation_sequence'][0]['exposure_time']
+                data_collection['exposureTime'] = mx_collection['oscillation_sequence'][0]['exposure_time']
             if mx_collection.get('oscillation_sequence')[0].get('start_image_number'):
-                data_collection['startImageNumber'] = \
-                    mx_collection['oscillation_sequence'][0]['start_image_number']
+                data_collection['startImageNumber'] = mx_collection['oscillation_sequence'][0]['start_image_number']
             if mx_collection.get('oscillation_sequence')[0].get('start'):
-                data_collection['axisStart'] = \
-                    mx_collection['oscillation_sequence'][0]['start']
+                data_collection['axisStart'] = mx_collection['oscillation_sequence'][0]['start']
             if mx_collection.get('oscillation_sequence')[0].get('range'):
-                data_collection['axisRange'] = \
-                    mx_collection['oscillation_sequence'][0]['range']
+                data_collection['axisRange'] = mx_collection['oscillation_sequence'][0]['range']
             if mx_collection.get('oscillation_sequence')[0].get('end'):
-                data_collection['axisEnd'] = \
-                    mx_collection['oscillation_sequence'][0]['end']
+                data_collection['axisEnd'] = mx_collection['oscillation_sequence'][0]['end']
             if mx_collection.get('oscillation_sequence')[0].get('overlap'):
-                data_collection['overlap'] = \
-                    mx_collection['oscillation_sequence'][0]['overlap']
+                data_collection['overlap'] = mx_collection['oscillation_sequence'][0]['overlap']
         if mx_collection.get('resolution'):
-            data_collection['resolution'] = mx_collection['resolution']
+            if mx_collection['resolution'].get('upper'):
+                data_collection['resolution'] = mx_collection['resolution']['upper']
         if mx_collection.get('detectorDistance'):
             data_collection['detectorDistance'] = mx_collection['detectorDistance']
         if mx_collection.get('transmission'):
@@ -447,6 +441,8 @@ class ISPyBAPIClient(HardwareObject):
             data_collection['yBeam'] = mx_collection['yBeam']
         if mx_collection.get('rotation_axis'):
             data_collection['rotationAxis'] = mx_collection['rotation_axis']
+        if mx_collection.get('comment'):
+            data_collection['comments'] = mx_collection['comment']
 
         return data_collection
 
@@ -949,12 +945,12 @@ class ISPyBAPIClient(HardwareObject):
         return db_data_collection
 
     @hwo_header_log
-    def _update_grid_info(self, grid_info_dict: dict,
+    def _update_grid_info(self, grid_id: int, grid_info_dict: dict,
                           sql_session: DBSession = None):
         if not sql_session:
             sql_session = next(self.get_db_session())
         db_grid_info = sql_session.query(GridInfo) \
-            .filter(GridInfo.gridInfoId == grid_info_dict['gridInfoId']) \
+            .filter(GridInfo.gridInfoId == grid_id) \
             .one()
         for key, value in grid_info_dict.items():
             if getattr(db_grid_info, key) != value:
@@ -962,17 +958,17 @@ class ISPyBAPIClient(HardwareObject):
         sql_session.commit()
         sql_session.refresh(db_grid_info)
         self.log.info(f"Record updated in the ISPyB \"gridinfo\" table.\n"
-                      f"RECORD [id {grid_info_dict['gridInfoId']}]: \n{grid_info_dict}")
+                      f"RECORD [id {grid_id}]: \n{grid_info_dict}")
         return db_grid_info
 
     @hwo_header_log
-    def _update_motor_positions(self, motor_pos_dict: dict,
+    def _update_motor_positions(self, motor_pos_id: int, motor_pos_dict: dict,
                                 sql_session: DBSession = None):
 
         if not sql_session:
             sql_session = next(self.get_db_session())
         db_motor_pos = sql_session.query(MotorPosition) \
-            .filter(MotorPosition.motorPositionId == motor_pos_dict['motorPositionId']) \
+            .filter(MotorPosition.motorPositionId == motor_pos_id) \
             .one()
         for key, value in motor_pos_dict.items():
             if getattr(db_motor_pos, key) != value:
@@ -980,17 +976,17 @@ class ISPyBAPIClient(HardwareObject):
         sql_session.commit()
         sql_session.refresh(db_motor_pos)
         self.log.info(f"Record updated in the ISPyB \"motorposition\" table.\n"
-                      f"RECORD [id {motor_pos_dict['motorPositionId']}]:"
+                      f"RECORD [id {motor_pos_id}]:"
                       f" \n{db_motor_pos.__dict__}")
         return db_motor_pos
 
     @hwo_header_log
-    def _update_position(self, pos_dict: dict, sql_session: DBSession = None):
+    def _update_position(self, pos_id: int, pos_dict: dict, sql_session: DBSession = None):
 
         if not sql_session:
             sql_session = next(self.get_db_session())
         db_pos = sql_session.query(Position) \
-            .filter(Position.positionId == pos_dict['positionId']) \
+            .filter(Position.positionId == pos_id) \
             .one()
         for key, value in pos_dict.items():
             if getattr(db_pos, key) != value:
@@ -998,16 +994,16 @@ class ISPyBAPIClient(HardwareObject):
         sql_session.commit()
         sql_session.refresh(db_pos)
         self.log.info(f"Record updated in the ISPyB \"position\" table.\n"
-                      f"RECORD [id {pos_dict['positionId']}]: \n{db_pos.__dict__}")
+                      f"RECORD [id {pos_id}]: \n{db_pos.__dict__}")
         return db_pos
 
     @hwo_header_log
-    def _update_data_collection_group(self, dcg_dict: dict,
-                                      sql_session: DBSession = None):
+    def _update_data_collection_group(self, dcg_id: int, dcg_dict: dict, sql_session: DBSession = None):
+
         if not sql_session:
             sql_session = next(self.get_db_session())
         db_dcg = sql_session.query(DataCollectionGroup) \
-            .filter(DataCollectionGroup.dataCollectionGroupId == dcg_dict['dataCollectionGroupId']) \
+            .filter(DataCollectionGroup.dataCollectionGroupId == dcg_id) \
             .one()
         for key, value in dcg_dict.items():
             if getattr(db_dcg, key) != value:
@@ -1015,17 +1011,17 @@ class ISPyBAPIClient(HardwareObject):
         sql_session.commit()
         sql_session.refresh(db_dcg)
         self.log.info(f"Record updated in the ISPyB \"datacollectiongroup\" table.\n"
-                      f"RECORD [id {dcg_dict['dataCollectionGroupId']}]: "
+                      f"RECORD [id {dcg_id}]: "
                       f"\n{db_dcg.__dict__}")
         return db_dcg
 
     @hwo_header_log
-    def _update_data_collection(self, dc_dict: dict, sql_session: DBSession = None):
+    def _update_data_collection(self, dc_id: int, dc_dict: dict, sql_session: DBSession = None):
 
         if not sql_session:
             sql_session = next(self.get_db_session())
         db_dc = sql_session.query(DataCollection)\
-            .filter(DataCollection.dataCollectionId == dc_dict['dataCollectionId'])\
+            .filter(DataCollection.dataCollectionId == dc_id)\
             .one()
         for key, value in dc_dict.items():
             if getattr(db_dc, key) != value:
@@ -1033,11 +1029,11 @@ class ISPyBAPIClient(HardwareObject):
         sql_session.commit()
         sql_session.refresh(db_dc)
         self.log.info(f"Record updated in the ISPyB \"datacollection\" table.\n"
-                      f"RECORD [id {dc_dict['dataCollectionId']}]: \n{db_dc.__dict__}")
+                      f"RECORD [id {dc_id}]: \n{db_dc.__dict__}")
         return db_dc
 
     @hwo_header_log
-    def update_data_collection(self, mx_collection, grid_dict = None):
+    def update_data_collection(self, mx_collection, grid_dict = dict({})):
         """
         Updates the datacollection mx_collection, this requires that the
         collectionId attribute is set and exists in the database.
@@ -1050,26 +1046,44 @@ class ISPyBAPIClient(HardwareObject):
         with self.SqlAlchemySession() as sql_session:
             sql_session: DBSession
 
-            # DataCollection
-            dc_dict = self.extract_data_collection_from_mx_collection(mx_collection)
-            self._update_data_collection(dc_dict, sql_session)
-
-            # DataCollectionGroup
-            dcg_dict = self.extract_data_collection_group_from_mx_collection(mx_collection)
-            self._update_data_collection_group(dcg_dict, sql_session)
-
             if mx_collection['experiment_type'] == 'Mesh':
-                grid_dict = self.extract_grid_info(grid_dict, mx_collection)
-                self._update_grid_info(grid_dict, sql_session)
+                grid_info_dict = self.extract_grid_info(grid_dict, mx_collection)
+                if 'gridInfoId' in grid_info_dict:
+                    grid_info_id = grid_info_dict.pop('gridInfoId')
+                    self._update_grid_info(grid_info_id, grid_info_dict, sql_session)
+                elif grid_info_dict:
+                    db_grid_info = self._insert_grid_info(grid_info_dict, sql_session)
+                    mx_collection['grid_id'] = db_grid_info.gridInfoId
 
             # Position
             pos_dict = self.extract_position_from_mx_collection(mx_collection)
-            self._update_position(pos_dict, sql_session)
+            if 'positionId' in pos_dict:
+                pos_id = pos_dict.pop('positionId')
+                self._update_position(pos_id, pos_dict, sql_session)
+            elif pos_dict:
+                db_pos = self._insert_position(pos_dict, sql_session)
+                mx_collection['pos_id'] = db_pos.positionId
 
             # Motor Position (Starting position)
             motor_pos_dict = self.extract_motor_position_from_mx_collection(mx_collection)
-            self._update_motor_positions(motor_pos_dict, sql_session)
+            if 'motorPositionId' in motor_pos_dict:
+                motor_pos_id = motor_pos_dict.pop('motorPositionId')
+                self._update_motor_positions(motor_pos_id, motor_pos_dict, sql_session)
+            elif motor_pos_dict:
+                db_motor_pos = self._insert_motor_positions(motor_pos_dict, sql_session)
+                mx_collection['motor_pos_id'] = db_motor_pos.motorPositionId
 
+            # DataCollectionGroup
+            dcg_dict = self.extract_data_collection_group_from_mx_collection(mx_collection)
+            if 'dataCollectionGroupId' in dcg_dict:
+                dcg_id = dcg_dict.pop('dataCollectionGroupId')
+                self._update_data_collection_group(dcg_id, dcg_dict, sql_session)
+
+            # DataCollection
+            dc_dict = self.extract_data_collection_from_mx_collection(mx_collection)
+            if 'dataCollectionId' in dc_dict:
+                dc_id = dc_dict.pop('dataCollectionId')
+                self._update_data_collection(dc_id, dc_dict, sql_session)
 
     @hwo_header_log
     def update_bl_sample(self, bl_sample):
@@ -1112,7 +1126,7 @@ class ISPyBAPIClient(HardwareObject):
         return grid_info_id
 
     @hwo_header_log
-    def store_data_collection(self, mx_collection, grid_dict = None, bl_config=None):
+    def store_data_collection(self, mx_collection, grid_dict = dict({}), bl_config=None):
         """
         Stores the data collection mx_collection, and the beamline setup
         if provided.
@@ -1127,13 +1141,6 @@ class ISPyBAPIClient(HardwareObject):
 
 
         """
-
-        self.log.debug("Data collection parameters stored in ISPyB: %s"
-                       % str(mx_collection))
-        self.log.debug("Beamline setup stored in ISPyB: %s" % str(bl_config))
-
-        print("---- MX collection ---")
-        print(mx_collection)
 
         with self.SqlAlchemySession() as sql_session:
             sql_session: DBSession
@@ -1163,6 +1170,7 @@ class ISPyBAPIClient(HardwareObject):
             # DataCollection
             dc_dict = self.extract_data_collection_from_mx_collection(mx_collection)
             db_data_collection = self._insert_data_collection(dc_dict, sql_session)
+            mx_collection["collection_id"] = db_data_collection.dataCollectionId
 
         return db_data_collection.dataCollectionId, None
 

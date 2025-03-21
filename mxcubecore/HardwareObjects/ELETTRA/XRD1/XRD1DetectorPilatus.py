@@ -53,6 +53,7 @@ class XRD1DetectorPilatus(AbstractDetector):
         self.cmd_start_acq = None
         self.cmd_stop_acq = None
         self.cmd_reset = None
+        self.file_suffix = None
 
     @hwo_header_log
     def init(self):
@@ -65,6 +66,7 @@ class XRD1DetectorPilatus(AbstractDetector):
         self.cmd_start_acq = self.get_command_object("start_acq")
         self.cmd_stop_acq = self.get_command_object("stop_acq")
         self.cmd_reset = self.get_command_object("restart")
+        self.file_suffix = self.get_property("file_suffix", "")
 
         # SIGNALS CONNECTIONS
         self.connect(self.ch_state, "update", lambda state: self.update_state(
