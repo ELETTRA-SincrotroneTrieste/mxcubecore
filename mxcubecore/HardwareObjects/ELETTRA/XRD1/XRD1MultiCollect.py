@@ -117,9 +117,9 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
 
             # Create new datacollection in ISPyB
             self.collection_id, detector_id = HWR.beamline.lims.store_data_collection(data_collect_parameters)
-            self.user_log.info("Data collection parameters stored in ISPyB")
+            self.log.info("Data collection parameters stored in ISPyB")
 
-            # Setup tango device
+            # Setup tango devices
             self.prepare_collection(data_collect_parameters)
 
             # Handle manual sample
@@ -129,7 +129,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
                 # In any case the "data_collect_parameters" will be updated with the
                 # sample_id
                 self.populate_dc_params_with_sample_info(data_collect_parameters)
-                self.user_log.info("Manual sample stored in ISPyB")
+                self.log.info("Manual sample stored in ISPyB")
 
             # Populate data_collect_parameters
             self.populate_dc_params_with_beamline_info(data_collect_parameters)
@@ -142,11 +142,11 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
 
             # Update datacollection in ISPyB
             HWR.beamline.lims.update_data_collection(data_collect_parameters, wait=True)
-            self.user_log.info("Data collection parameters updated in ISPyB")
+            self.log.info("Data collection parameters updated in ISPyB")
 
             # Start actual data collection
             self.cmd_start()
-            self.user_log.info(f"Data collection launched (executer '{self.ch_start_phi.device_name}' is ON)")
+            self.log.info(f"Data collection launched (executer '{self.ch_start_phi.device_name}' is 'ON')")
             t_start = time.time()
             exp_time = float(data_collect_parameters['oscillation_sequence'][0]['exposure_time'])
             num_imgs = float(data_collect_parameters['oscillation_sequence'][0]['number_of_images'])
@@ -166,8 +166,8 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
                     num = int(num_imgs * (elapsed_time/total_acq_time))
                     self.emit('collectImageTaken', num)
                     gevent.sleep(self.ch_state.polling / 1000)
-                self.user_log.info(f"Data collection finished (executer '{self.ch_start_phi.device_name}'"
-                                   f" is {self.ch_state.get_value()})")
+                self.log.info(f"Data collection finished (executer '{self.ch_start_phi.device_name}'"
+                              f" is '{self.ch_state.get_value()}')")
             data_collect_parameters["collection_end_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
         except Exception as exc:
             data_collect_parameters["comment"] = f"Data collection failed: {str(exc)}"
@@ -226,7 +226,11 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
     @task
     @hwo_header_log
     def data_collection_cleanup(self):
-        pass
+
+        # Abort the executer if it is still running
+        if self.ch_state.get_value() not in [PyTango.DevState.OFF, PyTango.DevState.FAULT]:
+            self.stop_acquisition()
+            self.log.info(f"Device tango (executer) {self.ch_start_phi.device_name} stopped!")
 
     @hwo_header_log
     def populate_dc_params_with_centring_info(self, data_collect_parameters):
