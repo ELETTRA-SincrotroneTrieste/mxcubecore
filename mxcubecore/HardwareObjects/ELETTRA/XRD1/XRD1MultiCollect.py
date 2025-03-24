@@ -115,6 +115,15 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         try:
             data_collect_parameters["collection_start_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
 
+            # Handle manual sample
+            if data_collect_parameters['sample_reference']['blSampleId'] == -1:
+                # Check if there is a sample with the same name and acronym in
+                # the ISPyB database, if it doesn't exist a new one will be created
+                # In any case the "data_collect_parameters" will be updated with the
+                # sample_id
+                self.populate_dc_params_with_sample_info(data_collect_parameters)
+                self.log.info("Manual sample stored in ISPyB")
+
             # Create new datacollection in ISPyB
             self.collection_id, detector_id = HWR.beamline.lims.store_data_collection(data_collect_parameters)
             self.log.info("Data collection parameters stored in ISPyB")
