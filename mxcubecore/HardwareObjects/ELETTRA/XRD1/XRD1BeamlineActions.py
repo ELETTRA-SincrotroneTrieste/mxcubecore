@@ -27,9 +27,10 @@ import enum
 import logging
 import time
 
-from mxcubecore.HardwareObjects.BeamlineActions import BeamlineActions
+from mxcubecore.HardwareObjects.BeamlineActions import BeamlineActions, ControllerCommand
 from mxcubecore.BaseHardwareObjects import HardwareObjectState
 from mxcubecore import HardwareRepository as HWR
+import gevent
 
 
 class EnumArg(str, enum.Enum):
@@ -76,7 +77,34 @@ class SampleOnLeft:
             HWR.beamline.diffractometer.head_orientation.VALUES.Left)
 
 
+def _cmd_done(obj, cmd_execution):
+    """Handle the command execution.
+
+    This overrides ControllerCommand._cmd_done(...) because it emitted both 'commandReplyArrived' and 'commandReady'
+    after executing a command. As a result, the message 'Command <command name> done' was appearing twice in the UI log.
+
+    Args:
+        (obj): Command execution greenlet.
+    """
+
+    try:
+        res = cmd_execution.get()
+        res = res if res else ""
+    except Exception:
+        logging.getLogger("HWR").exception("%s: execution failed", str(obj.name()))
+        obj.emit("commandFailed", (str(obj.name()),))
+    else:
+        if isinstance(res, gevent.GreenletExit):
+            # command aborted
+            obj.emit("commandFailed", (str(obj.name()),))
+        else:
+            obj.emit("commandReplyArrived", (str(obj.name()), res))
+
+
 class XRD1BeamlineActions(BeamlineActions):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        # A horrible patch (don't do again and ask mxcube community), see the method's docstring for clarifications
+        ControllerCommand._cmd_done = _cmd_done
