@@ -58,23 +58,36 @@ class GoToWellKnownPos:
 
 class SampleOnTop:
     def __call__(self, *args, **kw):
-
-        HWR.beamline.diffractometer.head_orientation.set_value(
-            HWR.beamline.diffractometer.head_orientation.VALUES.Top)
+        if HWR.beamline.diffractometer.head_orientation.get_value() == \
+            HWR.beamline.diffractometer.head_orientation.VALUES.Top:
+            logging.getLogger("user_level_log").info(
+                "Sample is already in TOP position")
+        else:
+            HWR.beamline.diffractometer.head_orientation.set_value(
+                HWR.beamline.diffractometer.head_orientation.VALUES.Top)
 
 
 class SampleOnBottom:
     def __call__(self, *args, **kw):
-
-        HWR.beamline.diffractometer.head_orientation.set_value(
-            HWR.beamline.diffractometer.head_orientation.VALUES.Bottom)
+        if HWR.beamline.diffractometer.head_orientation.get_value() == \
+            HWR.beamline.diffractometer.head_orientation.VALUES.Bottom:
+            logging.getLogger("user_level_log").info(
+                "Sample is already in BOTTOM position")
+        else:
+            HWR.beamline.diffractometer.head_orientation.set_value(
+                HWR.beamline.diffractometer.head_orientation.VALUES.Bottom)
 
 
 class SampleOnLeft:
     def __call__(self, *args, **kw):
 
-        HWR.beamline.diffractometer.head_orientation.set_value(
-            HWR.beamline.diffractometer.head_orientation.VALUES.Left)
+        if HWR.beamline.diffractometer.head_orientation.get_value() == \
+            HWR.beamline.diffractometer.head_orientation.VALUES.Left:
+            logging.getLogger("user_level_log").info(
+                "Sample is already in LEFT position")
+        else:
+            HWR.beamline.diffractometer.head_orientation.set_value(
+                HWR.beamline.diffractometer.head_orientation.VALUES.Left)
 
 
 def _cmd_done(obj, cmd_execution):
