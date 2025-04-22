@@ -38,6 +38,7 @@ class GalilAxisMotor(AbstractMotor):
         PyTango.DevState.MOVING: AbstractMotor.STATES.BUSY,
         PyTango.DevState.FAULT: AbstractMotor.STATES.FAULT,
         PyTango.DevState.OFF: AbstractMotor.STATES.OFF,
+        PyTango.DevState.ALARM: AbstractMotor.STATES.WARNING,
         PyTango.DevState.UNKNOWN: AbstractMotor.STATES.UNKNOWN
     }
 
@@ -45,6 +46,7 @@ class GalilAxisMotor(AbstractMotor):
         AbstractMotor.__init__(self, name)
         self.ch_position = None
         self.ch_state = None
+        self.ch_status = None
         self.cmd_set_position = None
         self.ch_accuracy = None
         self.cmd_stop = None
@@ -57,6 +59,7 @@ class GalilAxisMotor(AbstractMotor):
         super(GalilAxisMotor, self).init()
         self.ch_position = self.get_channel_object("axis_position", optional=False)
         self.ch_state = self.get_channel_object("axis_state", optional=False)
+        self.ch_status = self.get_channel_object("axis_status", optional=False)
         self.ch_velocity = self.get_channel_object("axis_velocity", optional=True)
         self.ch_accuracy = self.get_channel_object("axis_accuracy", optional=True)
         self.cmd_stop = self.get_command_object("stop_axis")
@@ -64,13 +67,33 @@ class GalilAxisMotor(AbstractMotor):
 
         # SIGNALS CONNECTIONS
         self.connect(self.ch_position, "update", self.update_value)
-        self.connect(self.ch_state, "update",
-                     lambda state: self.update_state(
-                         self.map_to_mxcube_state.get(state, self.STATES.UNKNOWN)))
+        self.connect(self.ch_state, "update", self._update_state)
         if self.ch_velocity:
             self.connect(self.ch_velocity, "update", self.set_velocity)
 
         self._tolerance = self.ch_accuracy.get_value()
+
+    @hwo_header_log
+    def is_limit_sw_triggered(self, state, notify_ui=False):
+        tango_status = self.ch_status.get_value().strip()
+        # If limit switch triggered
+        if state == AbstractMotor.STATES.WARNING and tango_status.endswith("limit switch"):
+            if notify_ui:
+                limit_switch = tango_status.replace("Motion ended due ", "")
+                self.user_log.warning(f"The axis \"{self.username}\" reached the {limit_switch}")
+            return True
+        return False
+
+    @hwo_header_log
+    def _update_state(self, tango_state=None):
+        if tango_state is None:
+            state = get_state(tango_state)
+        else:
+            state = self.map_to_mxcube_state.get(tango_state, self.STATES.UNKNOWN)
+        if self.is_limit_sw_triggered(state, notify_ui=True):
+            state = AbstractMotor.STATES.READY
+        self.update_state(state)
+
 
     @hwo_header_log
     def get_value(self):
@@ -93,6 +116,8 @@ class GalilAxisMotor(AbstractMotor):
         try:
             tango_state = self.ch_state.get_value()
             state = self.map_to_mxcube_state.get(tango_state, self.STATES.UNKNOWN)
+            if self.is_limit_sw_triggered(state):
+                state = AbstractMotor.STATES.READY
             self.log.info(f"Read the state of the axis \"{self.username}\" "
                           f"(it's \"{state.name}\")")
         except PyTango.DevFailed:
