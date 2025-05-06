@@ -417,6 +417,13 @@ class XRD1Diffractometer(GenericDiffractometer):
     @hwo_header_log
     def go_to_well_known_pos(self):
 
+        # Safety checks
+        if HWR.beamline.diffractometer.head_orientation.get_value() == HWR.beamline.diffractometer.head_orientation.VALUES.Triclinic:
+            err_msg = "A \"well known position\" can not be reached when the sample is in TRICLINIC position" \
+                      " (change position to LEFT)"
+            self.user_log.error(err_msg)
+            raise err_msg
+
         # Make phi position orthogonal to the camera
         curr_pos = self.kappa_phi.get_value()
         min_diff = 360

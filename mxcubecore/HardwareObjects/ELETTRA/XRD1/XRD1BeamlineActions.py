@@ -90,6 +90,18 @@ class SampleOnLeft:
                 HWR.beamline.diffractometer.head_orientation.VALUES.Left)
 
 
+class SampleTriclinic:
+    def __call__(self, *args, **kw):
+
+        if HWR.beamline.diffractometer.head_orientation.get_value() == \
+            HWR.beamline.diffractometer.head_orientation.VALUES.Triclinic:
+            logging.getLogger("user_level_log").info(
+                "Sample is already in TRICLINIC position")
+        else:
+            HWR.beamline.diffractometer.head_orientation.set_value(
+                HWR.beamline.diffractometer.head_orientation.VALUES.Triclinic)
+
+
 def _cmd_done(obj, cmd_execution):
     """Handle the command execution.
 

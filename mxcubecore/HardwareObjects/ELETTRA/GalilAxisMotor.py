@@ -87,7 +87,7 @@ class GalilAxisMotor(AbstractMotor):
     @hwo_header_log
     def _update_state(self, tango_state=None):
         if tango_state is None:
-            state = get_state(tango_state)
+            state = self.get_state(tango_state)
         else:
             state = self.map_to_mxcube_state.get(tango_state, self.STATES.UNKNOWN)
         if self.is_limit_sw_triggered(state, notify_ui=True):
@@ -173,6 +173,12 @@ class GalilAxisMotor(AbstractMotor):
                       f" device \"{self.cmd_stop.device_name}\""
             self.log.exception(err_msg)
             raise RuntimeError(err_msg)
+
+    @hwo_header_log
+    def is_in_postion(self, position):
+        curr_pos = self.get_value()
+        diff = abs(curr_pos % 360 - position % 360)
+        return diff < self._tolerance
 
     @hwo_header_log
     def get_motor_mnemonic(self):
