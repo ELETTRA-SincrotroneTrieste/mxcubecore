@@ -259,6 +259,9 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         data_collect_parameters["actualCenteringPosition"] = positions_str.strip()
         data_collect_parameters["centeringMethod"] = centring_status.get("method")
 
+        self.user_log.info("Moving sample to the center position...")
+        self.move_motors(motors_to_move_before_collect)
+
         # TODO evaluate whether retrieve data collection from DB
 
     @hwo_header_log
@@ -530,8 +533,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
 
     @hwo_header_log
     def move_motors(self, motor_position_dict):
-        for motor, value in motor_position_dict:
-            self.bl_control.diffractometer.motor_hwobj_dict[motor].set_value(value)
+        HWR.beamline.diffractometer.move_motors(motor_position_dict, timeout=30)
 
     @hwo_header_log
     def open_safety_shutter(self):
