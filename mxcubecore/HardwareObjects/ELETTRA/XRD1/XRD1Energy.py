@@ -25,6 +25,7 @@ __category__ = "General"
 
 import PyTango
 import gevent
+import time
 
 from mxcubecore.BaseHardwareObjects import HardwareObjectState
 from mxcubecore.HardwareObjects.abstract.AbstractEnergy import AbstractEnergy
@@ -53,6 +54,7 @@ class XRD1Energy(AbstractEnergy):
         self.cmd_start_method = None
         self.cmd_abort_method = None
         self.timeout = None
+        self.last_values = [0, 0, 0]
 
     @hwo_header_log
     def init(self):
@@ -66,15 +68,29 @@ class XRD1Energy(AbstractEnergy):
         self.timeout = self.get_property("timeout")
 
         # SIGNALS CONNECTIONS
-        self.connect(self.ch_mono_energy, "update", self.update_value)
+        self.connect(self.ch_mono_energy, "update", self._update_value)
         self.connect(self.ch_mono_state, "update", lambda tango_stat: self.update_state(
             self.map_to_mxcube_state.get(tango_stat, self.STATES.UNKNOWN)))
+
+    @hwo_header_log
+    def get_actual_energy(self, value):
+        if value < self.get_limits()[0] or value > self.get_limits()[1]:
+            value = self.last_value
+        else:
+            self.last_value = value
+        return value
+
+    @hwo_header_log
+    def _update_value(self, value=None):
+        self.update_value(None)
 
     @hwo_header_log
     def get_value(self):
 
         try:
             value = self.ch_mono_energy.get_value()
+            value = self.get_actual_energy(value) # Needed because BCS sometimes erroneously returns a
+                                                  # MonochromatorEnergy value of 0.0 keV.
             self.log.info(f"Read the value of the \"{self.username}\" "
                           f"(it's \"{value}{self.unit}\")")
         except PyTango.DevFailed:
