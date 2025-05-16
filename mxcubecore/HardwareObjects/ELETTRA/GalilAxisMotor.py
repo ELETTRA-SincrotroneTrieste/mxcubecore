@@ -87,7 +87,10 @@ class GalilAxisMotor(AbstractMotor):
     @hwo_header_log
     def _update_state(self, tango_state=None):
         if tango_state is None:
-            state = self.get_state(tango_state)
+            try:
+                state = self.get_state(tango_state)
+            except PyTango.DevFailed:
+                state = self.STATES.UNKNOWN
         else:
             state = self.map_to_mxcube_state.get(tango_state, self.STATES.UNKNOWN)
         if self.is_limit_sw_triggered(state, notify_ui=True):
