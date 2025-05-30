@@ -39,7 +39,7 @@ class GalilAxisMotor(AbstractMotor):
         PyTango.DevState.FAULT: AbstractMotor.STATES.FAULT,
         PyTango.DevState.OFF: AbstractMotor.STATES.OFF,
         PyTango.DevState.ALARM: AbstractMotor.STATES.WARNING,
-        PyTango.DevState.UNKNOWN: AbstractMotor.STATES.UNKNOWN
+        PyTango.DevState.UNKNOWN: AbstractMotor.STATES.UNKNOWN,
     }
 
     def __init__(self, name):
@@ -77,10 +77,14 @@ class GalilAxisMotor(AbstractMotor):
     def is_limit_sw_triggered(self, state, notify_ui=False):
         tango_status = self.ch_status.get_value().strip()
         # If limit switch triggered
-        if state == AbstractMotor.STATES.WARNING and tango_status.endswith("limit switch"):
+        if state == AbstractMotor.STATES.WARNING and tango_status.endswith(
+            "limit switch"
+        ):
             if notify_ui:
                 limit_switch = tango_status.replace("Motion ended due ", "")
-                self.user_log.warning(f"The axis \"{self.username}\" reached the {limit_switch}")
+                self.user_log.warning(
+                    f'The axis "{self.username}" reached the {limit_switch}'
+                )
             return True
         return False
 
@@ -97,18 +101,20 @@ class GalilAxisMotor(AbstractMotor):
             state = AbstractMotor.STATES.READY
         self.update_state(state)
 
-
     @hwo_header_log
     def get_value(self):
 
         try:
             value = self.ch_position.get_value()
-            self.log.info(f"Read the position of the axis \"{self.username}\""
-                          f" (it's \"{value})\"")
+            self.log.info(
+                f'Read the position of the axis "{self.username}"' f' (it\'s "{value})"'
+            )
         except PyTango.DevFailed:
-            err_msg = f"Failed to read the position of the axis \"{self.username}\"" \
-                      f" from the attribute \"{self.ch_position.attribute_name}\" of" \
-                      f" the tango device \"{self.ch_position.device_name}\""
+            err_msg = (
+                f'Failed to read the position of the axis "{self.username}" '
+                f'from the attribute "{self.ch_position.attribute_name}"'
+                f' of the tango device "{self.ch_position.device_name}"'
+            )
             self.log.exception(err_msg)
             raise ValueError(err_msg)
         return value
@@ -121,12 +127,16 @@ class GalilAxisMotor(AbstractMotor):
             state = self.map_to_mxcube_state.get(tango_state, self.STATES.UNKNOWN)
             if self.is_limit_sw_triggered(state):
                 state = AbstractMotor.STATES.READY
-            self.log.info(f"Read the state of the axis \"{self.username}\" "
-                          f"(it's \"{state.name}\")")
+            self.log.info(
+                f'Read the state of the axis "{self.username}" '
+                f'(it\'s "{state.name}")'
+            )
         except PyTango.DevFailed:
-            err_msg = f"Failed to read the state of the axis \"{self.username}\" from" \
-                      f" the attribute \"{self.ch_state.attribute_name}\" of the " \
-                      f"tango device \"{self.ch_state.device_name}\" "
+            err_msg = (
+                f'Failed to read the state of the axis "{self.username}"'
+                f' from the attribute "{self.ch_state.attribute_name}"'
+                f' of the tango device "{self.ch_state.device_name}" '
+            )
             self.log.exception(err_msg)
             raise ValueError(err_msg)
         return state
@@ -135,23 +145,36 @@ class GalilAxisMotor(AbstractMotor):
     def _set_value(self, value):
 
         try:
+            if abs(self.get_value() - value) <= self._tolerance:
+                self.log.info(
+                    f'The axis "{self.username}" is already in the target position "{value}"'
+                )
+                return
             self.ch_position.set_value(value)
             gevent.sleep(0.5)
-            with gevent.Timeout(self.timeout,
-                                TimeoutError(f"Timed out. The axis \"{self.username}\""
-                                             f" has not reached the target position "
-                                             f"after {self.timeout} sec")):
+            with gevent.Timeout(
+                self.timeout,
+                TimeoutError(
+                    f'Timed out. The axis "{self.username}"'
+                    f" has not reached the target position "
+                    f"after {self.timeout} sec"
+                ),
+            ):
                 while self.get_state() != self.STATES.READY:
-                    self.log.debug(f"Waiting \"{self.username}\" to reach the target"
-                                   f" position {value}")
+                    self.log.debug(
+                        f'Waiting "{self.username}" to reach the target'
+                        f" position {value}"
+                    )
                     gevent.sleep(self.ch_state.polling / 1000)
-            self.log.info(f"The axis \"{self.username}\" reached the target"
-                          f" position \"{value}\"")
+            self.log.info(
+                f'The axis "{self.username}" reached the target' f' position "{value}"'
+            )
         except PyTango.DevFailed:
-            err_msg = f"Failed to change the position of the axis \"{self.username}\"" \
-                      f" setting the attribute \"{self.ch_position.attribute_name}\"" \
-                      f" of the tango device \"{self.ch_position.device_name}\" to" \
-                      f" \"{value}\""
+            err_msg = (
+                f'Failed to change the position of the axis "{self.username}"'
+                f' setting the attribute "{self.ch_position.attribute_name}" '
+                f'of the tango device "{self.ch_position.device_name}" to "{value}"'
+            )
             self.user_log.error(err_msg)
             raise RuntimeError(err_msg)
         except TimeoutError as e:
@@ -166,14 +189,16 @@ class GalilAxisMotor(AbstractMotor):
 
         try:
             self.cmd_stop()
-            self.log.info(f"Abort command sent to the axis \"{self.username}\"")
+            self.log.info(f'Abort command sent to the axis "{self.username}"')
             # ensure that the state is updated at least once after the polling time
             # in case we miss the state update
             gevent.sleep(self.ch_state.polling / 1000)
         except PyTango.DevFailed:
-            err_msg = f"Failed to abort positioning of the axis \"{self.username}\"" \
-                      f" calling the command \"{self.cmd_stop.command}\" of the tango" \
-                      f" device \"{self.cmd_stop.device_name}\""
+            err_msg = (
+                f'Failed to abort positioning of the axis "{self.username}"'
+                f' calling the command "{self.cmd_stop.command}"'
+                f' of the tango device "{self.cmd_stop.device_name}"'
+            )
             self.log.exception(err_msg)
             raise RuntimeError(err_msg)
 
