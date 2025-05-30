@@ -25,7 +25,6 @@ __category__ = "General"
 
 import PyTango
 import gevent
-import time
 
 from mxcubecore.BaseHardwareObjects import HardwareObjectState
 from mxcubecore.HardwareObjects.abstract.AbstractEnergy import AbstractEnergy
@@ -42,7 +41,7 @@ class XRD1Energy(AbstractEnergy):
         PyTango.DevState.INIT: HardwareObjectState.OFF,
         PyTango.DevState.DISABLE: HardwareObjectState.OFF,
         PyTango.DevState.FAULT: HardwareObjectState.FAULT,
-        PyTango.DevState.UNKNOWN: HardwareObjectState.UNKNOWN
+        PyTango.DevState.UNKNOWN: HardwareObjectState.UNKNOWN,
     }
 
     def __init__(self, name):
@@ -54,7 +53,7 @@ class XRD1Energy(AbstractEnergy):
         self.cmd_start_method = None
         self.cmd_abort_method = None
         self.timeout = None
-        self.last_values = [0, 0, 0]
+        self.last_value = None
 
     @hwo_header_log
     def init(self):
@@ -69,8 +68,13 @@ class XRD1Energy(AbstractEnergy):
 
         # SIGNALS CONNECTIONS
         self.connect(self.ch_mono_energy, "update", self._update_value)
-        self.connect(self.ch_mono_state, "update", lambda tango_stat: self.update_state(
-            self.map_to_mxcube_state.get(tango_stat, self.STATES.UNKNOWN)))
+        self.connect(
+            self.ch_mono_state,
+            "update",
+            lambda tango_stat: self.update_state(
+                self.map_to_mxcube_state.get(tango_stat, self.STATES.UNKNOWN)
+            ),
+        )
 
     @hwo_header_log
     def get_actual_energy(self, value):
@@ -89,14 +93,19 @@ class XRD1Energy(AbstractEnergy):
 
         try:
             value = self.ch_mono_energy.get_value()
-            value = self.get_actual_energy(value) # Needed because BCS sometimes erroneously returns a
-                                                  # MonochromatorEnergy value of 0.0 keV.
-            self.log.info(f"Read the value of the \"{self.username}\" "
-                          f"(it's \"{value}{self.unit}\")")
+            value = self.get_actual_energy(
+                value
+            )  # Needed because BCS sometimes erroneously returns a
+            # MonochromatorEnergy value of 0.0 keV.
+            self.log.info(
+                f'Read the value of the "{self.username}" (it\'s "{value}{self.unit}")'
+            )
         except PyTango.DevFailed:
-            err_msg = f"Failed to read \"{self.username}\" from the " \
-                      f"attribute \"{self.ch_mono_energy.attribute_name}\" of the " \
-                      f"tango device \"{self.ch_mono_energy.device_name}\""
+            err_msg = (
+                f'Failed to read "{self.username}" '
+                f'from the attribute "{self.ch_mono_energy.attribute_name}"'
+                f' of the tango device "{self.ch_mono_energy.device_name}"'
+            )
             self.log.exception(err_msg)
             raise ValueError(err_msg)
 
@@ -111,23 +120,31 @@ class XRD1Energy(AbstractEnergy):
             self.cmd_start_method("change_energy")
             gevent.sleep(0.2)
             with gevent.Timeout(
-                self.timeout, TimeoutError(f"Timed out. The \"{self.username}\" "
-                                           f"has not reached the target value after"
-                                           f" {self.timeout} sec")
+                self.timeout,
+                TimeoutError(
+                    f"Timed out. "
+                    f'The "{self.username}" has not reached the target value'
+                    f" after {self.timeout} sec"
+                ),
             ):
                 while self.ch_mono_state.get_value() != PyTango.DevState.OFF:
-                    self.log.debug(f"Waiting \"{self.username}\" to reach the target"
-                                   f" value {value}")
+                    self.log.debug(
+                        f'Waiting "{self.username}" to reach the target'
+                        f" value {value}"
+                    )
                     gevent.sleep(self.ch_mono_state.polling / 1000)
-            self.log.info(f"The \"{self.username}\" reached the target value"
-                          f" \"{value}\"")
+            self.log.info(
+                f'The "{self.username}" reached the target value' f' "{value}"'
+            )
         except PyTango.DevFailed:
-            err_msg = f"Failed to reach the target value of the \"{self.username}\" " \
-                      f"setting the attribute " \
-                      f"\"{self.ch_target_energy.attribute_name}\" of the tango " \
-                      f"device \"{self.ch_target_energy.device_name}\" to \"{value}\"" \
-                      f" and calling the command \"{self.cmd_start_method.command}\"" \
-                      f" of the same tango device with argument \"change_energy\""
+            err_msg = (
+                f'Failed to reach the target value of the "{self.username}" '
+                f"setting the attribute "
+                f'"{self.ch_target_energy.attribute_name}" of the tango '
+                f'device "{self.ch_target_energy.device_name}" to "{value}"'
+                f' and calling the command "{self.cmd_start_method.command}"'
+                f' of the same tango device with argument "change_energy"'
+            )
             raise RuntimeError(err_msg)
         except TimeoutError as e:
             self.user_log.error(str(e))
@@ -143,10 +160,12 @@ class XRD1Energy(AbstractEnergy):
 
         try:
             self.cmd_abort_method()
-            self.log.info(f"Abort command sent to the \"{self.username}\"")
+            self.log.info(f'Abort command sent to the "{self.username}"')
         except PyTango.DevFailed:
-            err_msg = f"Failed to abort changing the value of the \"{self.username}\"" \
-                      f" calling the command \"{self.cmd_abort_method.command}\" of " \
-                      f"the tango device \"{self.cmd_abort_method.device_name}\""
+            err_msg = (
+                f'Failed to abort changing the value of the "{self.username}"'
+                f' calling the command "{self.cmd_abort_method.command}" of '
+                f'the tango device "{self.cmd_abort_method.device_name}"'
+            )
             self.log.exception(err_msg)
             raise RuntimeError(err_msg)
