@@ -31,8 +31,9 @@ import gevent
 import PyTango
 
 from mxcubecore.BaseHardwareObjects import HardwareObject
-from mxcubecore.HardwareObjects.abstract.AbstractMultiCollect import \
-    AbstractMultiCollect
+from mxcubecore.HardwareObjects.abstract.AbstractMultiCollect import (
+    AbstractMultiCollect,
+)
 from mxcubecore import HardwareRepository as HWR
 from mxcubecore.TaskUtils import task
 from mxcubecore.model.queue_model_objects import Sample, Crystal
@@ -40,7 +41,6 @@ from mxcubecore import hwo_header_log
 
 
 class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
-
     def __init__(self, name):
 
         AbstractMultiCollect.__init__(self)
@@ -89,19 +89,29 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         )
 
         self.ch_acq_mode = self.get_channel_object("acq_mode", optional=False)
-        self.ch_continuous_daq = self.get_channel_object("continuous_daq", optional=False)
+        self.ch_continuous_daq = self.get_channel_object(
+            "continuous_daq", optional=False
+        )
         self.ch_start_phi = self.get_channel_object("start_phi", optional=False)
         self.ch_delta_phi = self.get_channel_object("delta_phi", optional=False)
         self.ch_exposure_time = self.get_channel_object("exposure_time", optional=False)
         self.ch_total_frames = self.get_channel_object("total_frames", optional=False)
         self.ch_start_frame = self.get_channel_object("start_frame", optional=False)
         self.ch_file_root = self.get_channel_object("file_root", optional=False)
-        self.ch_run_number = self.get_channel_object("run_number", optional=False, )
-        self.ch_file_cbf_selected = self.get_channel_object("file_cbf_selected", optional=False)
+        self.ch_run_number = self.get_channel_object(
+            "run_number",
+            optional=False,
+        )
+        self.ch_file_cbf_selected = self.get_channel_object(
+            "file_cbf_selected", optional=False
+        )
         self.ch_sub_dir = self.get_channel_object("sub_dir", optional=False)
-        self.ch_forced_investigation = self.get_channel_object("forced_investigation", optional=False)
-        self.ch_detector_distance_mm = self.get_channel_object("detector_distance_mm",
-                                                               optional=False)
+        self.ch_forced_investigation = self.get_channel_object(
+            "forced_investigation", optional=False
+        )
+        self.ch_detector_distance_mm = self.get_channel_object(
+            "detector_distance_mm", optional=False
+        )
         self.ch_state = self.get_channel_object("state", optional=False)
         self.cmd_start = self.get_command_object("start")
         self.cmd_abort = self.get_command_object("abort")
@@ -113,10 +123,12 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
     def do_collect(self, owner, data_collect_parameters):
 
         try:
-            data_collect_parameters["collection_start_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            data_collect_parameters["collection_start_time"] = time.strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
 
             # Handle manual sample
-            if data_collect_parameters['sample_reference']['blSampleId'] == -1:
+            if data_collect_parameters["sample_reference"]["blSampleId"] == -1:
                 # Check if there is a sample with the same name and acronym in
                 # the ISPyB database, if it doesn't exist a new one will be created
                 # In any case the "data_collect_parameters" will be updated with the
@@ -125,14 +137,16 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
                 self.log.info("Manual sample stored in ISPyB")
 
             # Create new datacollection in ISPyB
-            self.collection_id, detector_id = HWR.beamline.lims.store_data_collection(data_collect_parameters)
+            self.collection_id, detector_id = HWR.beamline.lims.store_data_collection(
+                data_collect_parameters
+            )
             self.log.info("Data collection parameters stored in ISPyB")
 
             # Setup tango devices
             self.prepare_collection(data_collect_parameters)
 
             # Handle manual sample
-            if data_collect_parameters['sample_reference']['blSampleId'] == -1:
+            if data_collect_parameters["sample_reference"]["blSampleId"] == -1:
                 # Check if there is a sample with the same name and acronym in
                 # the ISPyB database, if it doesn't exist a new one will be created
                 # In any case the "data_collect_parameters" will be updated with the
@@ -144,10 +158,16 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
             self.populate_dc_params_with_beamline_info(data_collect_parameters)
             self.populate_dc_params_with_centring_info(data_collect_parameters)
             self.populate_dc_params_with_other_info(data_collect_parameters)
-            sample_id, sample_location, sample_code = self.get_sample_info_from_parameters(data_collect_parameters)
+            (
+                sample_id,
+                sample_location,
+                sample_code,
+            ) = self.get_sample_info_from_parameters(data_collect_parameters)
             data_collect_parameters["blSampleId"] = sample_id
-            self.log.info(f"Data collection parameters:"
-                          f"\n{json.dumps(data_collect_parameters, indent=3, default=lambda obj: repr(obj))}")
+            self.log.info(
+                f"Data collection parameters:"
+                f"\n{json.dumps(data_collect_parameters, indent=3, default=lambda obj: repr(obj))}"
+            )
 
             # Update datacollection in ISPyB
             HWR.beamline.lims.update_data_collection(data_collect_parameters, wait=True)
@@ -155,29 +175,46 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
 
             # Start actual data collection
             self.cmd_start()
-            self.log.info(f"Data collection launched (executer '{self.ch_start_phi.device_name}' is 'ON')")
+            self.log.info(
+                f"Data collection launched (executer '{self.ch_start_phi.device_name}' is 'ON')"
+            )
             t_start = time.time()
-            exp_time = float(data_collect_parameters['oscillation_sequence'][0]['exposure_time'])
-            num_imgs = float(data_collect_parameters['oscillation_sequence'][0]['number_of_images'])
+            exp_time = float(
+                data_collect_parameters["oscillation_sequence"][0]["exposure_time"]
+            )
+            num_imgs = float(
+                data_collect_parameters["oscillation_sequence"][0]["number_of_images"]
+            )
             total_acq_time = exp_time * num_imgs
             offset = 60  # [sec]
-            with gevent.Timeout(total_acq_time + offset,
-                                TimeoutError(f"Timed out. The datacollection took too much"
-                                             f" time to end (more than the total exposure: "
-                                             f"{total_acq_time} sec)")):
+            with gevent.Timeout(
+                total_acq_time + offset,
+                TimeoutError(
+                    f"Timed out. The datacollection took too much"
+                    f" time to end (more than the total exposure: "
+                    f"{total_acq_time} sec)"
+                ),
+            ):
                 while True:
                     try:
-                        if self.ch_state.get_value() in [PyTango.DevState.OFF, PyTango.DevState.FAULT]:
+                        if self.ch_state.get_value() in [
+                            PyTango.DevState.OFF,
+                            PyTango.DevState.FAULT,
+                        ]:
                             break
                     except PyTango.DevFailed.timeout:
                         pass
                     elapsed_time = min(time.time() - t_start, total_acq_time)
-                    num = int(num_imgs * (elapsed_time/total_acq_time))
-                    self.emit('collectImageTaken', num)
+                    num = int(num_imgs * (elapsed_time / total_acq_time))
+                    self.emit("collectImageTaken", num)
                     gevent.sleep(self.ch_state.polling / 1000)
-                self.log.info(f"Data collection finished (executer '{self.ch_start_phi.device_name}'"
-                              f" is '{self.ch_state.get_value()}')")
-            data_collect_parameters["collection_end_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                self.log.info(
+                    f"Data collection finished (executer '{self.ch_start_phi.device_name}'"
+                    f" is '{self.ch_state.get_value()}')"
+                )
+            data_collect_parameters["collection_end_time"] = time.strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
         except Exception as exc:
             data_collect_parameters["comment"] = f"Data collection failed: {str(exc)}"
             raise exc
@@ -198,48 +235,72 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
 
         # VUO dataset info
         investigation = HWR.beamline.session.get_investigation()
-        experiment = os.path.relpath(data_collect_parameters['fileinfo']['directory'],
-                                     HWR.beamline.session.get_base_image_directory()).split("/")[0]
-        dataset = data_collect_parameters['fileinfo']['run_number']
-        file_basename = data_collect_parameters['fileinfo']['prefix']
+        experiment = os.path.relpath(
+            data_collect_parameters["fileinfo"]["directory"],
+            HWR.beamline.session.get_base_image_directory(),
+        ).split("/")[0]
+        dataset = data_collect_parameters["fileinfo"]["run_number"]
+        file_basename = data_collect_parameters["fileinfo"]["prefix"]
 
-        self.log.info("Acq information:\n"
-                      f"Investigation: {investigation}\n"
-                      f"experiment: {experiment}\n"
-                      f"dataset: {dataset}\n"
-                      f"file_basename: {file_basename}"
-                      )
+        self.log.info(
+            "Acq information:\n"
+            f"Investigation: {investigation}\n"
+            f"experiment: {experiment}\n"
+            f"dataset: {dataset}\n"
+            f"file_basename: {file_basename}"
+        )
 
-        self.log.debug(f"Configuring device tango (executer) "
-                       f"{self.ch_start_phi.device_name} for the acquisition of the "
-                       f"dataset {investigation}/{experiment}/{dataset}")
+        self.log.debug(
+            f"Configuring device tango (executer) "
+            f"{self.ch_start_phi.device_name} for the acquisition of the "
+            f"dataset {investigation}/{experiment}/{dataset}"
+        )
 
         self.ch_acq_mode.set_value(2)  # Default ACQ_CONTINUOUS
         self.ch_continuous_daq.set_value(True)
-        self.ch_start_phi.set_value(data_collect_parameters['oscillation_sequence'][0]['start'])
-        self.ch_delta_phi.set_value(data_collect_parameters['oscillation_sequence'][0]['range'])
-        self.ch_exposure_time.set_value(data_collect_parameters['oscillation_sequence'][0]['exposure_time'])
-        self.ch_total_frames.set_value(data_collect_parameters['oscillation_sequence'][0]['number_of_images'])
-        self.ch_start_frame.set_value(data_collect_parameters['oscillation_sequence'][0]['start_image_number'])
+        self.ch_start_phi.set_value(
+            data_collect_parameters["oscillation_sequence"][0]["start"]
+        )
+        self.ch_delta_phi.set_value(
+            data_collect_parameters["oscillation_sequence"][0]["range"]
+        )
+        self.ch_exposure_time.set_value(
+            data_collect_parameters["oscillation_sequence"][0]["exposure_time"]
+        )
+        self.ch_total_frames.set_value(
+            data_collect_parameters["oscillation_sequence"][0]["number_of_images"]
+        )
+        self.ch_start_frame.set_value(
+            data_collect_parameters["oscillation_sequence"][0]["start_image_number"]
+        )
         self.ch_forced_investigation.set_value(investigation)
         self.ch_sub_dir.set_value(experiment)
         self.ch_run_number.set_value(dataset)
         self.ch_file_root.set_value(file_basename)
         self.ch_file_cbf_selected.set_value(True)  # Default cbf (instead of tif)
-        self.ch_detector_distance_mm.set_value(self.bl_control.detector_distance.get_value())
+        self.ch_detector_distance_mm.set_value(
+            self.bl_control.detector_distance.get_value()
+        )
 
-        self.log.info(f"Device tango (executer) {self.ch_start_phi.device_name}"
-                      f" configured for the acquisition of the dataset "
-                      f"{investigation}/{experiment}/{dataset}")
+        self.log.info(
+            f"Device tango (executer) {self.ch_start_phi.device_name}"
+            f" configured for the acquisition of the dataset "
+            f"{investigation}/{experiment}/{dataset}"
+        )
 
     @task
     @hwo_header_log
     def data_collection_cleanup(self):
 
         # Abort the executer if it is still running
-        if self.ch_state.get_value() not in [PyTango.DevState.OFF, PyTango.DevState.FAULT]:
+        if self.ch_state.get_value() not in [
+            PyTango.DevState.OFF,
+            PyTango.DevState.FAULT,
+        ]:
             self.stop_acquisition()
-            self.log.info(f"Device tango (executer) {self.ch_start_phi.device_name} stopped!")
+            self.log.info(
+                f"Device tango (executer) {self.ch_start_phi.device_name} stopped!"
+            )
 
     @hwo_header_log
     def populate_dc_params_with_centring_info(self, data_collect_parameters):
@@ -267,20 +328,16 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
     @hwo_header_log
     def populate_dc_params_with_other_info(self, data_collect_parameters):
 
-        data_collect_parameters['oscillation_sequence'][0]['end'] = \
-            data_collect_parameters['oscillation_sequence'][0]['start'] + \
-            data_collect_parameters['oscillation_sequence'][0]['range']
-        data_collect_parameters['rotation_axis'] = 'Phi'
+        data_collect_parameters["oscillation_sequence"][0]["end"] = (
+            data_collect_parameters["oscillation_sequence"][0]["start"]
+            + data_collect_parameters["oscillation_sequence"][0]["range"]
+        )
+        data_collect_parameters["rotation_axis"] = "Phi"
 
-        run_num = data_collect_parameters['fileinfo']['run_number']
-        directory = data_collect_parameters['fileinfo']['directory'].\
-            replace(HWR.beamline.session.run_num_placeholder, str(run_num))
-        data_collect_parameters['fileinfo']['directory'] = directory
-
-        suffix = data_collect_parameters['fileinfo']['template']
+        suffix = data_collect_parameters["fileinfo"]["template"]
         precision = HWR.beamline.session.precision
         suffix = suffix.replace("%" + ("%sd" % precision), int(precision) * "#")
-        data_collect_parameters['fileinfo']['template'] = suffix
+        data_collect_parameters["fileinfo"]["template"] = suffix
 
     @hwo_header_log
     def populate_dc_params_with_beamline_info(self, data_collect_parameters):
@@ -303,13 +360,19 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
     @hwo_header_log
     def populate_dc_params_with_sample_info(self, data_collect_parameters):
 
-        queue_sample: Sample = HWR.beamline.queue_manager.get_current_entry().get_data_model().get_sample_node()
+        queue_sample: Sample = (
+            HWR.beamline.queue_manager.get_current_entry()
+            .get_data_model()
+            .get_sample_node()
+        )
         sample_name = queue_sample.get_name()
         crystal: Crystal = queue_sample.crystals[0]
         acronym = crystal.protein_acronym
-        session_id = data_collect_parameters['sessionId']
-        sample_id = HWR.beamline.lims.add_manual_session_sample(session_id, sample_name, acronym)
-        data_collect_parameters['sample_reference']['blSampleId'] = sample_id
+        session_id = data_collect_parameters["sessionId"]
+        sample_id = HWR.beamline.lims.add_manual_session_sample(
+            session_id, sample_name, acronym
+        )
+        data_collect_parameters["sample_reference"]["blSampleId"] = sample_id
 
     @hwo_header_log
     def set_detector_filenames(
@@ -326,7 +389,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
             if curr_transmission != transmission:
                 self.bl_control.transmission.set_value(float(transmission))
 
-        resolution = data_collect_parameters.get("resolution")['upper']
+        resolution = data_collect_parameters.get("resolution")["upper"]
         if resolution is not None:
             curr_resolution = float(self.bl_control.resolution.get_value())
             if curr_resolution != resolution:
@@ -500,8 +563,9 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         pass
 
     @hwo_header_log
-    def prepare_input_files(self, files_directory, prefix, run_number,
-                            process_directory):
+    def prepare_input_files(
+        self, files_directory, prefix, run_number, process_directory
+    ):
         pass
 
     @hwo_header_log
@@ -548,8 +612,9 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         pass
 
     @hwo_header_log
-    def prepare_acquisition(self, take_dark, start, osc_range, exptime, npass,
-                            number_of_images, comment):
+    def prepare_acquisition(
+        self, take_dark, start, osc_range, exptime, npass, number_of_images, comment
+    ):
         pass
 
     @hwo_header_log

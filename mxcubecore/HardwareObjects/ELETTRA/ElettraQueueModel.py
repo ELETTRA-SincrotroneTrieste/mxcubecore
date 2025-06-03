@@ -53,6 +53,7 @@ class ElettraQueueModel(HardwareObject):
         self._free_pin_model._node_id = 0
         self._plate_model = queue_model_objects.RootNode()
         self._plate_model._node_id = 0
+        self.session = None
 
         self._models = {
             "ispyb": self._ispyb_model,
@@ -78,7 +79,7 @@ class ElettraQueueModel(HardwareObject):
 
         You should normaly not need to call this method.
         """
-        pass
+        self.session = HWR.beamline.session
 
     @hwo_header_log
     def select_model(self, name):
@@ -306,6 +307,14 @@ class ElettraQueueModel(HardwareObject):
         in the model and returns the next available run number
         for the path template <new_path_template>.
 
+        Elettra changes:
+        - Retrieve the last RN from ispyb
+        - The collisions are matched against a sub path of the new_path_template.directory
+          e.g. /net/online4xrd1/store/20240574-0/test
+        - This method modifies the value of the attribute `directory` of the `new_path_template` replacing the RN
+          placeholder (i.e [RUN#]) with the actual RN
+          e.g. /net/online4xrd1/store/20240574-0/test/[RUN#]/rawdata/ -> /net/online4xrd1/store/20240574-0/test/4/rawdata/
+
         :param new_path_template: PathTempalte to match with.
         :type new_path_template: PathTemplate
         :param exclude_current: Skips it self when iterating through
@@ -316,12 +325,20 @@ class ElettraQueueModel(HardwareObject):
         :rtype: int
         """
 
-        strt_run_num = HWR.beamline.lims.get_last_dc_run_number(new_path_template.base_prefix)
+        strt_run_num = HWR.beamline.lims.get_last_dc_run_number(
+            new_path_template.base_prefix
+        )
 
         all_path_templates = self.get_path_templates()
         conflicting_path_templates = [strt_run_num]
 
+        new_pt_dir = str(new_path_template.directory)
+        # '/net/online4xrd1/store/20240574-0/test/[RUN#]/rawdata/' --> /net/online4xrd1/store/20240574-0/test
+        new_path_template.directory = os.path.join(*new_pt_dir.split("/")[:-3])
         for pt in all_path_templates:
+            pt_dir = str(pt[1].directory)
+            # '/net/online4xrd1/store/20240574-0/test/2/rawdata/' --> /net/online4xrd1/store/20240574-0/test
+            pt[1].directory = os.path.join(*pt_dir.split("/")[:-3])
             if exclude_current:
                 if pt[1] is not new_path_template:
                     if pt[1] == new_path_template:
@@ -329,8 +346,12 @@ class ElettraQueueModel(HardwareObject):
             else:
                 if pt[1] == new_path_template:
                     conflicting_path_templates.append(pt[1].run_number)
-
-        return max(conflicting_path_templates) + 1
+            pt[1].directory = pt_dir
+        new_run_number = max(conflicting_path_templates) + 1
+        new_path_template.directory = new_pt_dir.replace(
+            self.session.run_num_placeholder, str(new_run_number)
+        )
+        return new_run_number
 
     @hwo_header_log
     def get_path_templates(self):

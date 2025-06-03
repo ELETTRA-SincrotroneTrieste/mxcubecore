@@ -77,11 +77,19 @@ class ElettraSession(HardwareObject):
 
         self.suffix = self["file_info"].get_property("file_suffix")
         self.template = self["file_info"].get_property("file_template")
-        self.precision = "0" + str(self["file_info"].get_property("precision", self.default_precision))
+        self.precision = "0" + str(
+            self["file_info"].get_property("precision", self.default_precision)
+        )
         self.base_directory = self["file_info"].get_property("base_directory").strip()
-        self.run_num_placeholder = self["file_info"].get_property("prefix_folder_name", "").strip()
-        self.rawdata_folder_name = self["file_info"].get_property("raw_data_folder_name").strip()
-        self.processed_data_folder_name = self["file_info"].get_property("processed_data_folder_name").strip()
+        self.run_num_placeholder = (
+            self["file_info"].get_property("run_num_placeholder", "").strip()
+        )
+        self.rawdata_folder_name = (
+            self["file_info"].get_property("raw_data_folder_name").strip()
+        )
+        self.processed_data_folder_name = (
+            self["file_info"].get_property("processed_data_folder_name").strip()
+        )
 
         # Archive is on tape library (not directly reachable)
         self.archived_data_folder = ""
@@ -128,16 +136,22 @@ class ElettraSession(HardwareObject):
         if self.proposal_number and self.visit_num is not None:
             return f"{self.proposal_number}-{self.visit_num}"
         else:
-            raise ValueError("\"Proposal number\" or \"visit number\" undefined")
+            raise ValueError('"Proposal number" or "visit number" undefined')
 
     @hwo_header_log
     def prepare_directories(self, proposal_info):
         try:
-            HWR.beamline.lims.lims_rest.vuo_client.get_user_experiments(self.tag, self.get_investigation())
-            self.log.info(f"Investigation \"{self.get_investigation()}\" already exists in VUO")
+            HWR.beamline.lims.lims_rest.vuo_client.get_user_experiments(
+                self.tag, self.get_investigation()
+            )
+            self.log.info(
+                f'Investigation "{self.get_investigation()}" already exists in VUO'
+            )
         except:
-            HWR.beamline.lims.lims_rest.vuo_client.create_user_invest_from_prop(self.tag, self.proposal_number, inv_name=self.get_investigation())
-            self.log.info(f"Investigation \"{self.get_investigation()}\" created in VUO")
+            HWR.beamline.lims.lims_rest.vuo_client.create_user_invest_from_prop(
+                self.tag, self.proposal_number, inv_name=self.get_investigation()
+            )
+            self.log.info(f'Investigation "{self.get_investigation()}" created in VUO')
 
     @hwo_header_log
     def get_base_data_directory(self):
@@ -192,10 +206,12 @@ class ElettraSession(HardwareObject):
 
         directory = self.get_base_data_directory()
         if sub_dir:
-            # subdir can be "test" or "test/[RUN#]/rawdata"
-            sub_dir = sub_dir.replace(f'/{self.run_num_placeholder}/{self.rawdata_folder_name}', '')
+            # subdir can be "test" or "test/<RUN#>/rawdata" (on dc duplication)
+            sub_dir = sub_dir.split("/", 1)[0]
             sub_dir = sub_dir.replace(" ", "").replace(":", "-")
-            directory = os.path.join(directory, sub_dir, self.run_num_placeholder, self.rawdata_folder_name)
+            directory = os.path.join(
+                directory, sub_dir, self.run_num_placeholder, self.rawdata_folder_name
+            )
         return directory
 
     @hwo_header_log
@@ -210,10 +226,15 @@ class ElettraSession(HardwareObject):
         """
         directory = self.get_base_process_directory()
         if sub_dir:
-            # subdir can be "test" or "test/[RUN#]/rawdata"
-            sub_dir = sub_dir.replace(f'/{self.run_num_placeholder}/{self.processed_data_folder_name}', '')
+            # subdir can be "test" or "test/<RUN#>/work" (on dc duplication)
+            sub_dir = sub_dir.split("/", 1)[0]
             sub_dir = sub_dir.replace(" ", "").replace(":", "-")
-            directory = os.path.join(directory, sub_dir, self.run_num_placeholder, self.processed_data_folder_name)
+            directory = os.path.join(
+                directory,
+                sub_dir,
+                self.run_num_placeholder,
+                self.processed_data_folder_name,
+            )
         return directory
 
     @hwo_header_log
@@ -299,7 +320,8 @@ class ElettraSession(HardwareObject):
     def get_archive_directory(self):
         archive_directory = os.path.join(
             self["file_info"].get_property("archive_base_directory"),
-            self["file_info"].get_property("archive_folder"),)
+            self["file_info"].get_property("archive_folder"),
+        )
         return archive_directory
 
     @hwo_header_log

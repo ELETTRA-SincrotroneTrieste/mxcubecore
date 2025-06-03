@@ -41,7 +41,7 @@ class XRD1DetectorPilatus(AbstractDetector):
         PyTango.DevState.INIT: HardwareObjectState.OFF,
         PyTango.DevState.FAULT: HardwareObjectState.FAULT,
         PyTango.DevState.DISABLE: HardwareObjectState.OFF,
-        PyTango.DevState.UNKNOWN: HardwareObjectState.UNKNOWN
+        PyTango.DevState.UNKNOWN: HardwareObjectState.UNKNOWN,
     }
 
     def __init__(self, name):
@@ -60,8 +60,9 @@ class XRD1DetectorPilatus(AbstractDetector):
 
         super(XRD1DetectorPilatus, self).init()
 
-        self._exposure_time_limits = eval(self.get_property("exposure_time_limits",
-                                                            "[0.04, 60000]"))
+        self._exposure_time_limits = eval(
+            self.get_property("exposure_time_limits", "[0.04, 60000]")
+        )
         self.ch_state = self.get_channel_object("state", optional=False)
         self.cmd_start_acq = self.get_command_object("start_acq")
         self.cmd_stop_acq = self.get_command_object("stop_acq")
@@ -69,16 +70,21 @@ class XRD1DetectorPilatus(AbstractDetector):
         self.file_suffix = self.get_property("file_suffix", "")
 
         # SIGNALS CONNECTIONS
-        self.connect(self.ch_state, "update", lambda state: self.update_state(
-            self.map_to_mxcube_state.get(state, self.STATES.UNKNOWN)))
+        self.connect(
+            self.ch_state,
+            "update",
+            lambda state: self.update_state(
+                self.map_to_mxcube_state.get(state, self.STATES.UNKNOWN)
+            ),
+        )
 
     def get_image_file_name(self, path_template, suffix=None):
         template = "%s_%s_%%" + str(path_template.precision) + "d.%s"
-
         suffix = suffix or path_template.suffix
-        file_name = template % (path_template.get_prefix(),
-                                path_template.run_number,
-                                suffix
+        file_name = template % (
+            path_template.get_prefix(),
+            path_template.run_number,
+            suffix,
         )
         if path_template.compression:
             file_name = "%s.gz" % file_name
@@ -91,12 +97,15 @@ class XRD1DetectorPilatus(AbstractDetector):
         try:
             tango_state = self.ch_state.get_value()
             state = self.map_to_mxcube_state.get(tango_state, self.STATES.UNKNOWN)
-            self.log.info(f"Read the status of the \"{self.username}\" "
-                          f"(it's \"{state.name}\")")
+            self.log.info(
+                f'Read the status of the "{self.username}" ' f'(it\'s "{state.name}")'
+            )
         except PyTango.DevFailed:
-            err_msg = f"Failed to read the status of the \"{self.username}\" from " \
-                      f"the attribute \"{self.ch_state.attribute_name}\" of the " \
-                      f"tango device \"{self.ch_state.device_name}\" "
+            err_msg = (
+                f'Failed to read the status of the "{self.username}" from '
+                f'the attribute "{self.ch_state.attribute_name}" of the '
+                f'tango device "{self.ch_state.device_name}" '
+            )
             self.log.exception(err_msg)
             raise ValueError(err_msg)
         return state
@@ -117,11 +126,13 @@ class XRD1DetectorPilatus(AbstractDetector):
 
         try:
             self.cmd_start_acq()
-            self.log.info(f"Acquisition of the \"{self.username}\" started")
+            self.log.info(f'Acquisition of the "{self.username}" started')
         except PyTango.DevFailed:
-            err_msg = f"Failed to start the acquisition of the \"{self.username}\"" \
-                      f" calling the command {self.cmd_start_acq.command}\" of the" \
-                      f" tango device \"{self.cmd_start_acq.device_name}\""
+            err_msg = (
+                f'Failed to start the acquisition of the "{self.username}"'
+                f' calling the command {self.cmd_start_acq.command}" of the'
+                f' tango device "{self.cmd_start_acq.device_name}"'
+            )
             self.log.exception(err_msg)
             raise RuntimeError(err_msg)
         finally:
@@ -133,11 +144,13 @@ class XRD1DetectorPilatus(AbstractDetector):
 
         try:
             self.cmd_stop_acq()
-            self.log.info(f"Acquisition of the \"{self.username}\" stopped")
+            self.log.info(f'Acquisition of the "{self.username}" stopped')
         except PyTango.DevFailed:
-            err_msg = f"Failed to stop the acquisition of the \"{self.username}\" " \
-                      f"calling the command {self.cmd_start_acq.command}\" of the " \
-                      f"tango device \"{self.cmd_start_acq.device_name}\""
+            err_msg = (
+                f'Failed to stop the acquisition of the "{self.username}" '
+                f'calling the command {self.cmd_start_acq.command}" of the '
+                f'tango device "{self.cmd_start_acq.device_name}"'
+            )
             self.log.exception(err_msg)
             raise RuntimeError(err_msg)
         finally:
@@ -149,11 +162,13 @@ class XRD1DetectorPilatus(AbstractDetector):
 
         try:
             self.cmd_reset()
-            self.log.info(f"The \"{self.username}\" has been reset")
+            self.log.info(f'The "{self.username}" has been reset')
         except PyTango.DevFailed:
-            err_msg = f"Failed to reset the \"{self.username}\" calling the command" \
-                      f" {self.cmd_start_acq.command}\"" \
-                      f" of the tango device \"{self.cmd_start_acq.device_name}\""
+            err_msg = (
+                f'Failed to reset the "{self.username}" calling the command'
+                f' {self.cmd_start_acq.command}"'
+                f' of the tango device "{self.cmd_start_acq.device_name}"'
+            )
             self.log.exception(err_msg)
             raise RuntimeError(err_msg)
         finally:
