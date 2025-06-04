@@ -55,7 +55,7 @@ class XRD1Diffractometer(GenericDiffractometer):
         PyTango.DevState.ON: GenericDiffractometer.STATES.READY,
         PyTango.DevState.FAULT: GenericDiffractometer.STATES.FAULT,
         PyTango.DevState.OFF: GenericDiffractometer.STATES.OFF,
-        PyTango.DevState.UNKNOWN: GenericDiffractometer.STATES.UNKNOWN
+        PyTango.DevState.UNKNOWN: GenericDiffractometer.STATES.UNKNOWN,
     }
 
     GenericDiffractometer.CENTRING_METHOD_MANUAL = "Manual 2-click"
@@ -79,7 +79,7 @@ class XRD1Diffractometer(GenericDiffractometer):
         self.beam_center_y = None
         self.head_orientation = None
         self.mount_mode = None
-        self.last_centred_position = [333,222]  # [x, y]
+        self.last_centred_position = [333, 222]  # [x, y]
         self.well_known_phi_positions = None
         self.waiting_for_click = False
         self.click_lock = Semaphore()
@@ -94,14 +94,24 @@ class XRD1Diffractometer(GenericDiffractometer):
         }
 
         # CENTRING_MOTORS_NAME are configured in the xml
-        self.ch_centering_selected_x_mm = self.get_channel_object("centering_selected_x_mm", optional=False)
-        self.ch_centering_selected_y_mm = self.get_channel_object("centering_selected_y_mm", optional=False)
-        self.ch_centering_state = self.get_channel_object("centering_state", optional=False)
-        self.ch_centering_phase = self.get_channel_object("centering_phase", optional=False)
+        self.ch_centering_selected_x_mm = self.get_channel_object(
+            "centering_selected_x_mm", optional=False
+        )
+        self.ch_centering_selected_y_mm = self.get_channel_object(
+            "centering_selected_y_mm", optional=False
+        )
+        self.ch_centering_state = self.get_channel_object(
+            "centering_state", optional=False
+        )
+        self.ch_centering_phase = self.get_channel_object(
+            "centering_phase", optional=False
+        )
         self.ch_beam_center_x = self.get_channel_object("beam_center_x", optional=False)
         self.ch_beam_center_y = self.get_channel_object("beam_center_y", optional=False)
         self.ch_state = self.get_channel_object("state", optional=False)
-        self.cmd_centring_start_method = self.get_command_object("centring_start_method")
+        self.cmd_centring_start_method = self.get_command_object(
+            "centring_start_method"
+        )
         self.cmd_centring_abort = self.get_command_object("centring_abort")
         self.head_orientation = self.get_object_by_role("headorientation")
         self.mount_mode = self.get_property("sample_mount_mode", "manual")
@@ -174,7 +184,7 @@ class XRD1Diffractometer(GenericDiffractometer):
         image_width = float(HWR.beamline.sample_view.camera.get_width())
 
         # Get mm/px ratio based on the current zoom
-        mm_per_pixel = self.zoom.get_um_per_pixel() / 1000.
+        mm_per_pixel = self.zoom.get_um_per_pixel() / 1000.0
 
         x_mm = float(x - (image_width / 2.0)) * mm_per_pixel
         y_mm = float((image_height / 2.0) - y) * mm_per_pixel
@@ -188,10 +198,14 @@ class XRD1Diffractometer(GenericDiffractometer):
                 self.waiting_for_click = False
                 self.user_clicked_event.set((x, y))
             else:
-                self.log.warning("User click but the last centring operation"
-                                 " was still in progress")
-                raise RuntimeError("Last centring operation is still in "
-                                   "progress, click will be ignored")
+                self.log.warning(
+                    "User click but the last centring operation"
+                    " was still in progress"
+                )
+                raise RuntimeError(
+                    "Last centring operation is still in "
+                    "progress, click will be ignored"
+                )
 
     @hwo_header_log
     def start_centring_method(self, method, sample_info=None, wait=False):
@@ -199,8 +213,10 @@ class XRD1Diffractometer(GenericDiffractometer):
         self.check_centring_ready()
 
         if self.current_centring_method is not None:
-            self.log.error(f"Diffractometer: already in centring method"
-                           f" {self.current_centring_method}")
+            self.log.error(
+                f"Diffractometer: already in centring method"
+                f" {self.current_centring_method}"
+            )
             return
         curr_time = time.strftime("%Y-%m-%d %H:%M:%S")
         self.centring_status = {
@@ -213,8 +229,7 @@ class XRD1Diffractometer(GenericDiffractometer):
         try:
             centring_method = self.centring_methods[method]
         except KeyError as diag:
-            self.log.error(f"Diffractometer: unknown centring method"
-                           f" ({str(diag)})")
+            self.log.error(f"Diffractometer: unknown centring method" f" ({str(diag)})")
             self.emit_centring_failed()
         else:
             try:
@@ -234,31 +249,41 @@ class XRD1Diffractometer(GenericDiffractometer):
             # (executer)
             if self.get_state() != self.STATES.OFF:
                 self.abort_centring_operation()
-                time.sleep(0.5)  # Needed to start `twoClickcentring_fsm` method successfully
+                time.sleep(
+                    0.5
+                )  # Needed to start `twoClickcentring_fsm` method successfully
 
             # Start a new 2-clicks centring procedure (executer)
             self.cmd_centring_start_method("twoClickcentring_fsm")
-            self.log.debug(f"Start {self.CENTRING_METHOD_MANUAL} centring procedure of"
-                           f" \"{self.username}\" (executer)")
+            self.log.debug(
+                f"Start {self.CENTRING_METHOD_MANUAL} centring procedure of"
+                f' "{self.username}" (executer)'
+            )
 
             for click in range(HWR.beamline.click_centring_num_clicks):
                 self.user_clicked_event = AsyncResult()
                 self.waiting_for_click = True
                 x, y = self.user_clicked_event.get()
                 x_mm, y_mm = self.convert_pixels_to_mm(x, y)
-                self.log.debug(f"Cursor position:"
-                               f"\n- In pixel [x: {x} px, y: {y} px] (top-left origin)"
-                               f"\n- In mm [x: {x_mm} mm, y: {y_mm} mm]")
+                self.log.debug(
+                    f"Cursor position:"
+                    f"\n- In pixel [x: {x} px, y: {y} px] (top-left origin)"
+                    f"\n- In mm [x: {x_mm} mm, y: {y_mm} mm]"
+                )
 
                 # Wait the executer to turn in USER_SELECTING state
                 centring_state = self.get_centring_state()
                 while centring_state != TwoClickCentringState.USER_SELECTING:
-                    if centring_state in [TwoClickCentringState.ERROR,
-                                          TwoClickCentringState.USER_ABORTED]:
-                        err_msg = f"{self.CENTRING_METHOD_MANUAL} centring procedure " \
-                                  f"failed. Centring state of the tango device " \
-                                  f"{self.ch_centering_state.device_name} is " \
-                                  f"\"{centring_state.name}\""
+                    if centring_state in [
+                        TwoClickCentringState.ERROR,
+                        TwoClickCentringState.USER_ABORTED,
+                    ]:
+                        err_msg = (
+                            f"{self.CENTRING_METHOD_MANUAL} centring procedure "
+                            f"failed. Centring state of the tango device "
+                            f"{self.ch_centering_state.device_name} is "
+                            f'"{centring_state.name}"'
+                        )
                         self.log.error(err_msg)
                         self.user_log.error(err_msg)
                         raise Exception(err_msg)
@@ -270,22 +295,30 @@ class XRD1Diffractometer(GenericDiffractometer):
                 self.ch_centering_selected_y_mm.set_value(y_mm)
                 # Trigger the new step of the 2 clicks centring procedure (executer)
                 self.ch_centering_state.set_value(TwoClickCentringState.MOVING_H.value)
-                self.log.debug(f"Triggered next step of {self.CENTRING_METHOD_MANUAL}"
-                               f" centring procedure of \"{self.username}\"")
+                self.log.debug(
+                    f"Triggered next step of {self.CENTRING_METHOD_MANUAL}"
+                    f' centring procedure of "{self.username}"'
+                )
 
                 centring_state = self.get_centring_state()
-                while centring_state in [TwoClickCentringState.MOVING_H,
-                                         TwoClickCentringState.MOVING_V,
-                                         TwoClickCentringState.ROTATING_PHI,
-                                         TwoClickCentringState.WAITING_PHI,
-                                         TwoClickCentringState.WAITING_PICTURE_AXES]:
+                while centring_state in [
+                    TwoClickCentringState.MOVING_H,
+                    TwoClickCentringState.MOVING_V,
+                    TwoClickCentringState.ROTATING_PHI,
+                    TwoClickCentringState.WAITING_PHI,
+                    TwoClickCentringState.WAITING_PICTURE_AXES,
+                ]:
                     gevent.sleep(self.ch_centering_state.polling / 1000)
                     centring_state = self.get_centring_state()
 
-                if False and centring_state in [TwoClickCentringState.ERROR,
-                                      TwoClickCentringState.USER_ABORTED]:
-                    err_msg = f"{self.CENTRING_METHOD_MANUAL} centring procedure failed. Centring state of the tango" \
-                              f" device {self.ch_centering_state.device_name} is \"{centring_state.name}\""
+                if False and centring_state in [
+                    TwoClickCentringState.ERROR,
+                    TwoClickCentringState.USER_ABORTED,
+                ]:
+                    err_msg = (
+                        f"{self.CENTRING_METHOD_MANUAL} centring procedure failed. Centring state of the tango"
+                        f' device {self.ch_centering_state.device_name} is "{centring_state.name}"'
+                    )
                     self.log.error(err_msg)
                     self.user_log.error(err_msg)
                     raise Exception(err_msg)
@@ -305,21 +338,24 @@ class XRD1Diffractometer(GenericDiffractometer):
     @hwo_header_log
     def abort_centring_operation(self):
         self.cmd_centring_abort()
-        self.log.debug(f"Aborting centring operation of the \"{self.username}\" ...")
+        self.log.debug(f'Aborting centring operation of the "{self.username}" ...')
 
         # Wait the executer to turn in OFF state
-        with gevent.Timeout(self.timeout_centring_operation, RuntimeError(
-            f"Timed out. Fail to abort the previous {self.CENTRING_METHOD_MANUAL}"
-            f" centering procedure calling the command "
-            f"\"{self.cmd_centring_abort.command}\" of the tango"
-            f" device \"{self.cmd_centring_abort.device_name}\"")
+        with gevent.Timeout(
+            self.timeout_centring_operation,
+            RuntimeError(
+                f"Timed out. Fail to abort the previous {self.CENTRING_METHOD_MANUAL}"
+                f" centering procedure calling the command "
+                f'"{self.cmd_centring_abort.command}" of the tango'
+                f' device "{self.cmd_centring_abort.device_name}"'
+            ),
         ):
             while self.get_state() != self.STATES.OFF:
                 gevent.sleep(self.ch_state.polling / 1000)
         # After the executer goes OFF it's needed to wait few seconds more for the
         # centring procedure to exit
         time.sleep(1)
-        self.log.warning(f"Centring operation of the \"{self.username}\" aborted")
+        self.log.warning(f'Centring operation of the "{self.username}" aborted')
 
     @hwo_header_log
     def move_to_motors_positions(self, motors_positions, wait=False):
@@ -338,12 +374,15 @@ class XRD1Diffractometer(GenericDiffractometer):
         try:
             tango_state = self.ch_state.get_value()
             state = self.map_to_mxcube_state.get(tango_state, self.STATES.UNKNOWN)
-            self.log.info(f"Read the state of the \"{self.username}\" "
-                          f"(it's \"{state.name}\")")
+            self.log.info(
+                f'Read the state of the "{self.username}" ' f'(it\'s "{state.name}")'
+            )
         except PyTango.DevFailed:
-            err_msg = f"Failed to read the state of the \"{self.username}\" from" \
-                      f" the attribute \"{self.ch_state.attribute_name}\" of the " \
-                      f"tango device \"{self.ch_state.device_name}\" "
+            err_msg = (
+                f'Failed to read the state of the "{self.username}" from'
+                f' the attribute "{self.ch_state.attribute_name}" of the '
+                f'tango device "{self.ch_state.device_name}" '
+            )
             self.log.exception(err_msg)
             raise ValueError(err_msg)
         return state
@@ -362,8 +401,10 @@ class XRD1Diffractometer(GenericDiffractometer):
         Detects if device is moving
         """
 
-        return self.get_centring_state() in [TwoClickCentringState.ERROR,
-                                             TwoClickCentringState.USER_ABORTED]
+        return self.get_centring_state() in [
+            TwoClickCentringState.ERROR,
+            TwoClickCentringState.USER_ABORTED,
+        ]
 
     @hwo_header_log
     def is_moving(self):
@@ -371,11 +412,13 @@ class XRD1Diffractometer(GenericDiffractometer):
         Detects if device is moving
         """
 
-        return self.get_centring_state() in [TwoClickCentringState.MOVING_H,
-                                             TwoClickCentringState.MOVING_V,
-                                             TwoClickCentringState.ROTATING_PHI,
-                                             TwoClickCentringState.WAITING_PHI,
-                                             TwoClickCentringState.WAITING_PICTURE_AXES]
+        return self.get_centring_state() in [
+            TwoClickCentringState.MOVING_H,
+            TwoClickCentringState.MOVING_V,
+            TwoClickCentringState.ROTATING_PHI,
+            TwoClickCentringState.WAITING_PHI,
+            TwoClickCentringState.WAITING_PICTURE_AXES,
+        ]
 
     @hwo_header_log
     def is_ready(self):
@@ -388,7 +431,7 @@ class XRD1Diffractometer(GenericDiffractometer):
             self.kappa_phi.get_state(),
             self.alignment_z.get_state(),
             self.centring_x.get_state(),
-            self.centring_y.get_state()
+            self.centring_y.get_state(),
         ]
         if not all(state == self.STATES.READY for state in motors_states):
             ready = False
@@ -401,26 +444,37 @@ class XRD1Diffractometer(GenericDiffractometer):
     def check_centring_ready(self):
 
         if self.head_orientation.get_value() != self.head_orientation.VALUES.Left:
-            self.user_log.warning("Sample is not in LEFT position. Use "
-                                  "\"Beamline Actions\" to put it in LEFT"
-                                  " position")
-            raise RuntimeError("Sample is not in LEFT position, cannot start"
-                               " centering")
+            self.user_log.warning(
+                "Sample is not in LEFT position. Use "
+                '"Beamline Actions" to put it in LEFT'
+                " position"
+            )
+            raise RuntimeError(
+                "Sample is not in LEFT position, cannot start" " centering"
+            )
 
         if not self.is_in_well_known_pos():
-            self.user_log.warning("Phi motor is not in a \"Well Known Position\"."
-                                  " Use \"Beamline Actions\" to put Phi to a \""
-                                  "Well Known Position\"")
-            raise RuntimeError("Phi motor is not in a \"Well Known Position\", cannot "
-                               "start centering")
+            self.user_log.warning(
+                'Phi motor is not in a "Well Known Position".'
+                ' Use "Beamline Actions" to put Phi to a "'
+                'Well Known Position"'
+            )
+            raise RuntimeError(
+                'Phi motor is not in a "Well Known Position", cannot ' "start centering"
+            )
 
     @hwo_header_log
     def go_to_well_known_pos(self):
 
         # Safety checks
-        if HWR.beamline.diffractometer.head_orientation.get_value() == HWR.beamline.diffractometer.head_orientation.VALUES.Triclinic:
-            err_msg = "A \"well known position\" can not be reached when the sample is in TRICLINIC position" \
-                      " (change position to LEFT)"
+        if (
+            HWR.beamline.diffractometer.head_orientation.get_value()
+            == HWR.beamline.diffractometer.head_orientation.VALUES.Triclinic
+        ):
+            err_msg = (
+                'A "well known position" can not be reached when the sample is in TRICLINIC position'
+                " (change position to LEFT)"
+            )
             self.user_log.error(err_msg)
             raise err_msg
 
@@ -434,32 +488,44 @@ class XRD1Diffractometer(GenericDiffractometer):
                 go_to_pos = position
                 go_to_name_pos = pos_name
         self.cmd_centring_start_method(go_to_name_pos)
-        self.log.debug(f"The closest \"Well Known Position\" to the current"
-                       f" position ({curr_pos}) is: {go_to_pos}")
+        self.log.debug(
+            f'The closest "Well Known Position" to the current'
+            f" position ({curr_pos}) is: {go_to_pos}"
+        )
         timeout = 60  # [s]
-        with gevent.Timeout(timeout,
-                            TimeoutError(f"Timed out. Phi has not reached a "
-                                         f"well known position after "
-                                         f"{timeout} sec")):
+        with gevent.Timeout(
+            timeout,
+            TimeoutError(
+                f"Timed out. Phi has not reached a "
+                f"well known position after "
+                f"{timeout} sec"
+            ),
+        ):
             while not self.is_in_well_known_pos():
                 self.log.debug(f"Waiting Phi to reach a well known position")
                 gevent.sleep(
-                    HWR.beamline.diffractometer.kappa_phi.ch_state.polling
-                    / 1000)
+                    HWR.beamline.diffractometer.kappa_phi.ch_state.polling / 1000
+                )
         self.log.info(f"Phi has reached a well known position")
 
     @hwo_header_log
     def is_in_well_known_pos(self):
         in_pos = False
         curr_phi_pos = self.kappa_phi.get_value()
-        diffs = [abs(curr_phi_pos % 360 - pos) for pos in self.well_known_phi_positions.keys()]
+        diffs = [
+            abs(curr_phi_pos % 360 - pos)
+            for pos in self.well_known_phi_positions.keys()
+        ]
         for diff in diffs:
             if diff < self.kappa_phi._tolerance:
                 in_pos = True
         return in_pos
 
     def in_well_known_pos_dial(self, curr_phi_pos, i):
-        return abs(curr_phi_pos % 360 - list(self.well_known_phi_positions.keys())[i]) <= 45
+        return (
+            abs(curr_phi_pos % 360 - list(self.well_known_phi_positions.keys())[i])
+            <= 45
+        )
 
     @hwo_header_log
     def automatic_centring(self):
@@ -467,38 +533,62 @@ class XRD1Diffractometer(GenericDiffractometer):
         raise NotImplemented
 
     @hwo_header_log
-    def filter_read_only_motors(self, motor_positions):
+    def filter_motors_already_in_pos(self, motor_positions):
         for motor_role, value in list(motor_positions.items()):
             motor = self.motor_hwobj_dict.get(motor_role)
-            if motor.read_only and abs(motor.get_value() - value) < motor._tolerance:
+            if abs(motor.get_value() - value) <= motor._tolerance:
                 motor_positions.pop(motor_role)
 
     @hwo_header_log
     def motor_positions_to_screen(self, centred_positions_dict):
-        self.log.debug(f"Beam position on screen: "
-                       f"[x: {self.beam_position[0]} px,"
-                       f" y: {self.beam_position[1]} px]")
+        self.log.debug(
+            f"Beam position on screen: "
+            f"[x: {self.beam_position[0]} px,"
+            f" y: {self.beam_position[1]} px]"
+        )
 
         phi_well_known_pos = list(self.well_known_phi_positions.keys())
         try:
             pixels_per_mm_x, pixels_per_mm_y = self.get_pixels_per_mm()
             current_positions = self.get_positions()
             self.log.debug(f"Curent motors position: {current_positions}")
-            curr_x_pos_mm = current_positions['phiz']
-            curr_phi_pos = round(current_positions['phi'], 3)
-            if self.in_well_known_pos_dial(curr_phi_pos, 0) or self.in_well_known_pos_dial(curr_phi_pos, 2):  # 54.736, 234.736
-                curr_y_pos_mm = current_positions['sampx']
-                centr_y_pos_mm = centred_positions_dict['sampx']
-            elif self.in_well_known_pos_dial(curr_phi_pos, 1) or self.in_well_known_pos_dial(curr_phi_pos, 3):  # 144.736, 324.736
-                curr_y_pos_mm = current_positions['sampy']
-                centr_y_pos_mm = centred_positions_dict['sampy']
-            sign = 1 if self.in_well_known_pos_dial(curr_phi_pos, 2) or self.in_well_known_pos_dial(curr_phi_pos, 3) else - 1
-            centr_x_pos_mm = centred_positions_dict['phiz']
-            x_px = self.beam_position[0] + pixels_per_mm_x * (curr_x_pos_mm - centr_x_pos_mm)
-            y_px = self.beam_position[1] + pixels_per_mm_y * (curr_y_pos_mm - centr_y_pos_mm) * sign
-            self.log.debug(f"Calculated position on screen: [x: {x_px} px, y: {y_px} px]")
+            curr_x_pos_mm = current_positions["phiz"]
+            curr_phi_pos = round(current_positions["phi"], 3)
+            if self.in_well_known_pos_dial(
+                curr_phi_pos, 0
+            ) or self.in_well_known_pos_dial(
+                curr_phi_pos, 2
+            ):  # 54.736, 234.736
+                curr_y_pos_mm = current_positions["sampx"]
+                centr_y_pos_mm = centred_positions_dict["sampx"]
+            elif self.in_well_known_pos_dial(
+                curr_phi_pos, 1
+            ) or self.in_well_known_pos_dial(
+                curr_phi_pos, 3
+            ):  # 144.736, 324.736
+                curr_y_pos_mm = current_positions["sampy"]
+                centr_y_pos_mm = centred_positions_dict["sampy"]
+            sign = (
+                1
+                if self.in_well_known_pos_dial(curr_phi_pos, 2)
+                or self.in_well_known_pos_dial(curr_phi_pos, 3)
+                else -1
+            )
+            centr_x_pos_mm = centred_positions_dict["phiz"]
+            x_px = self.beam_position[0] + pixels_per_mm_x * (
+                curr_x_pos_mm - centr_x_pos_mm
+            )
+            y_px = (
+                self.beam_position[1]
+                + pixels_per_mm_y * (curr_y_pos_mm - centr_y_pos_mm) * sign
+            )
+            self.log.debug(
+                f"Calculated position on screen: [x: {x_px} px, y: {y_px} px]"
+            )
         except:
-            self.log.exception("Failed to calculate motor positions to screen, using beam center position")
+            self.log.exception(
+                "Failed to calculate motor positions to screen, using beam center position"
+            )
             x_px = self.beam_position[0]
             y_px = self.beam_position[1]
         return round(x_px), round(y_px)
@@ -506,8 +596,12 @@ class XRD1Diffractometer(GenericDiffractometer):
     @hwo_header_log
     def move_motors(self, motor_positions, timeout=15):
 
+        if "zoom" in motor_positions:
+            zoom_value = motor_positions.pop("zoom")
+            self.zoom.set_value(self.zoom.value_to_enum(zoom_value))
+
         # Needed to prevent a crash when calling <motor>.set_value() on "read-only" motors
-        self.filter_read_only_motors(motor_positions)
+        self.filter_motors_already_in_pos(motor_positions)
         super(XRD1Diffractometer, self).move_motors(motor_positions, timeout)
 
     @hwo_header_log
@@ -537,8 +631,8 @@ class XRD1Diffractometer(GenericDiffractometer):
         else:
             pos = pos.value
         self.current_motor_positions["zoom"] = pos
-        self.pixels_per_mm_x = int(1 / (self.zoom.get_um_per_pixel() / 1000.))
-        self.pixels_per_mm_y = int(1 / (self.zoom.get_um_per_pixel() / 1000.))
+        self.pixels_per_mm_x = int(1 / (self.zoom.get_um_per_pixel() / 1000.0))
+        self.pixels_per_mm_y = int(1 / (self.zoom.get_um_per_pixel() / 1000.0))
 
     @hwo_header_log
     def update_phi(self, pos=None):
