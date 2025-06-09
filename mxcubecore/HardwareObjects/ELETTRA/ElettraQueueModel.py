@@ -351,6 +351,11 @@ class ElettraQueueModel(HardwareObject):
         new_path_template.directory = new_pt_dir.replace(
             self.session.run_num_placeholder, str(new_run_number)
         )
+        new_path_template.process_directory = (
+            new_path_template.process_directory.replace(
+                self.session.run_num_placeholder, str(new_run_number)
+            )
+        )
         return new_run_number
 
     @hwo_header_log

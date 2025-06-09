@@ -182,10 +182,10 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
             exp_time = float(
                 data_collect_parameters["oscillation_sequence"][0]["exposure_time"]
             )
-            num_imgs = float(
+            total_num_imgs = float(
                 data_collect_parameters["oscillation_sequence"][0]["number_of_images"]
             )
-            total_acq_time = exp_time * num_imgs
+            total_acq_time = exp_time * total_num_imgs
             offset = 60  # [sec]
             with gevent.Timeout(
                 total_acq_time + offset,
@@ -205,8 +205,8 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
                     except PyTango.DevFailed.timeout:
                         pass
                     elapsed_time = min(time.time() - t_start, total_acq_time)
-                    num = int(num_imgs * (elapsed_time / total_acq_time))
-                    self.emit("collectImageTaken", num)
+                    curr_num_img = int(total_num_imgs * (elapsed_time / total_acq_time))
+                    self.emit("collectImageTaken", curr_num_img)
                     gevent.sleep(self.ch_state.polling / 1000)
                 self.log.info(
                     f"Data collection finished (executer '{self.ch_start_phi.device_name}'"
@@ -338,6 +338,12 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         precision = HWR.beamline.session.precision
         suffix = suffix.replace("%" + ("%sd" % precision), int(precision) * "#")
         data_collect_parameters["fileinfo"]["template"] = suffix
+
+        rawdata_path = data_collect_parameters["fileinfo"]["directory"]
+        xtal_filename = suffix.split("_#", 1)[0] + "_crystal.jpg"
+        data_collect_parameters["fileinfo"]["xtalSnapshotsPaths"] = [
+            os.path.join(rawdata_path, xtal_filename)
+        ]
 
     @hwo_header_log
     def populate_dc_params_with_beamline_info(self, data_collect_parameters):
