@@ -326,7 +326,7 @@ class ElettraQueueModel(HardwareObject):
         """
 
         strt_run_num = HWR.beamline.lims.get_last_dc_run_number(
-            new_path_template.base_prefix
+            new_path_template.base_directory, new_path_template.directory
         )
 
         all_path_templates = self.get_path_templates()
@@ -336,9 +336,22 @@ class ElettraQueueModel(HardwareObject):
         # '/net/online4xrd1/store/20240574-0/test/[RUN#]/rawdata/' --> /net/online4xrd1/store/20240574-0/test
         new_path_template.directory = os.path.join(*new_pt_dir.split("/")[:-3])
         for pt in all_path_templates:
-            pt_dir = str(pt[1].directory)
+
+            # Save the original values of the template attributes
+            pt_dir = pt[1].directory
+            pt_base_prefix = pt[1].base_prefix
+            pt_mad_prefix = pt[1].mad_prefix
+            pt_reference_image_prefix = pt[1].reference_image_prefix
+            pt_wedge_prefix = pt[1].wedge_prefix
             # '/net/online4xrd1/store/20240574-0/test/2/rawdata/' --> /net/online4xrd1/store/20240574-0/test
             pt[1].directory = os.path.join(*pt_dir.split("/")[:-3])
+            # Set all the prefix attributes of `pt` to match the new template, so that only the `directory` attribute
+            # is considered during comparison
+            pt[1].base_prefix = new_path_template.base_prefix
+            pt[1].mad_prefix = new_path_template.mad_prefix
+            pt[1].reference_image_prefix = new_path_template.reference_image_prefix
+            pt[1].wedge_prefix = new_path_template.wedge_prefix
+
             if exclude_current:
                 if pt[1] is not new_path_template:
                     if pt[1] == new_path_template:
@@ -346,7 +359,14 @@ class ElettraQueueModel(HardwareObject):
             else:
                 if pt[1] == new_path_template:
                     conflicting_path_templates.append(pt[1].run_number)
+
+            # Restore the original template attribute's values
             pt[1].directory = pt_dir
+            pt[1].base_prefix = pt_base_prefix
+            pt[1].mad_prefix = pt_mad_prefix
+            pt[1].reference_image_prefix = pt_reference_image_prefix
+            pt[1].wedge_prefix = pt_wedge_prefix
+
         new_run_number = max(conflicting_path_templates) + 1
         new_path_template.directory = new_pt_dir.replace(
             self.session.run_num_placeholder, str(new_run_number)

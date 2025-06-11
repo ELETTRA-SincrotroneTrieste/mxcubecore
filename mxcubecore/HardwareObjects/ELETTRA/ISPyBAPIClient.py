@@ -53,7 +53,7 @@ import sqlalchemy.orm
 from sqlalchemy import create_engine, update
 from sqlalchemy.orm import sessionmaker, joinedload
 from sqlalchemy.orm import Session as DBSession
-from sqlalchemy.sql.expression import func
+from sqlalchemy.sql.expression import func, or_
 
 from mxcubecore.BaseHardwareObjects import HardwareObject
 from mxcubecore import HardwareRepository as HWR
@@ -658,15 +658,45 @@ class ISPyBAPIClient(HardwareObject):
         return db_protein
 
     @hwo_header_log
-    def get_last_dc_run_number(self, image_prefix, sql_session: DBSession = None):
+    def get_last_dc_run_number(
+        self, base_directory: str, directory: str, sql_session: DBSession = None
+    ):
+        """
+        Returns the last data collection number (`dataCollectionNumber`) associated with the current session,
+        based on a provided directory path pattern.
+
+        The method builds two regular expressions from the input path to match against the
+        `imageDirectory` and `fileTemplate` fields in the `DataCollection` table.
+        This also ensures backward compatibility with older formats used in XRD2.
+
+        Args:
+            base_directory (str): The root storage path, e.g. '/net/online4xrd1/store'.
+            directory (str): Full path including a '[RUN#]' placeholder, e.g.
+                             '/net/online4xrd1/store/20240574-0/testa/[RUN#]/rawdata/'.
+            sql_session (DBSession, optional): An existing SQLAlchemy session. If not provided,
+                                               a new one will be created.
+
+        Returns:
+            int: The highest data collection number found for the current session, or 0 if no
+                 matching records are found.
+        """
+
+        collision_path = directory.replace(base_directory, "")
+        collision_path_re = f".*{collision_path.replace('[RUN#]', '[0-9]+')}$"
+        # For backward compatibility (XRD2 saved the image directory's path in the fileTemplate field in ispyb)
+        collision_path_re_old = f"^{collision_path.replace('[RUN#]', '/?[0-9]+')}.*"
         session_id = int(HWR.beamline.session.session_id)
-        img_prefix_regex = f"^(ref-)?{image_prefix}(_wedge-.+)?$"
         if not sql_session:
             sql_session: DBSession = next(self.get_db_session())
         last_run_number = (
             sql_session.query(func.max(DataCollection.dataCollectionNumber))
             .filter(DataCollection.SESSIONID == session_id)
-            .filter(DataCollection.imagePrefix.regexp_match(img_prefix_regex))
+            .filter(
+                or_(
+                    DataCollection.imageDirectory.regexp_match(collision_path_re),
+                    DataCollection.fileTemplate.regexp_match(collision_path_re_old),
+                )
+            )
             .scalar()
         )
         return last_run_number if last_run_number else 0
