@@ -92,7 +92,7 @@ class GalilAxisMotor(AbstractMotor):
     def _update_state(self, tango_state=None):
         if tango_state is None:
             try:
-                state = self.get_state(tango_state)
+                state = self.get_state()
             except PyTango.DevFailed:
                 state = self.STATES.UNKNOWN
         else:
