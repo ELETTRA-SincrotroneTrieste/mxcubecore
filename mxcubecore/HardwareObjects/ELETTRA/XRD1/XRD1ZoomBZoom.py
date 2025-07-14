@@ -27,7 +27,7 @@ from enum import Enum
 import PyTango
 
 from mxcubecore.HardwareObjects.abstract.AbstractNState import AbstractNState
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1ZoomBZoom(AbstractNState):
@@ -39,7 +39,7 @@ class XRD1ZoomBZoom(AbstractNState):
         self.ch_camera_num_zoom_levels = None
         self.ch_scale_um_per_pixel = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         self.ch_camera_num_zoom_levels = self.get_channel_object("num_zoom_levels",
@@ -57,7 +57,7 @@ class XRD1ZoomBZoom(AbstractNState):
         self.update_limits((0, len(self.VALUES)))
         self.update_state(self.STATES.READY)
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         try:
@@ -72,7 +72,7 @@ class XRD1ZoomBZoom(AbstractNState):
             raise ValueError(err_msg)
         return value
 
-    @hwo_header_log
+    @trace_call_log
     def _set_value(self, value):
 
         self.update_state(self.STATES.BUSY)

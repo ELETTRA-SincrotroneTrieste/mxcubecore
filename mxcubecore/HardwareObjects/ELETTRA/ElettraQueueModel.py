@@ -32,7 +32,7 @@ import logging
 import jsonpickle
 
 from mxcubecore.BaseHardwareObjects import HardwareObject
-from mxcubecore import queue_entry, hwo_header_log
+from mxcubecore import queue_entry, trace_call_log
 from mxcubecore.model import queue_model_objects
 from mxcubecore import HardwareRepository as HWR
 
@@ -81,7 +81,7 @@ class ElettraQueueModel(HardwareObject):
         """
         self.session = HWR.beamline.session
 
-    @hwo_header_log
+    @trace_call_log
     def select_model(self, name):
         """
         Selects the model with the name <name>
@@ -96,7 +96,7 @@ class ElettraQueueModel(HardwareObject):
         HWR.beamline.queue_manager.clear()
         self._re_emit(self._selected_model)
 
-    @hwo_header_log
+    @trace_call_log
     def get_model_root(self):
         """
         :returns: The selected model root.
@@ -104,7 +104,7 @@ class ElettraQueueModel(HardwareObject):
         """
         return self._selected_model
 
-    @hwo_header_log
+    @trace_call_log
     def clear_model(self, name=None):
         """
         Clears the model with name <name>, clears all if name is None

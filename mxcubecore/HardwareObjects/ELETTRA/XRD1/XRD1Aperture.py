@@ -28,7 +28,7 @@ import PyTango
 import gevent
 
 from mxcubecore.HardwareObjects.abstract.AbstractNState import AbstractNState
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1Aperture(AbstractNState):
@@ -41,7 +41,7 @@ class XRD1Aperture(AbstractNState):
         self.full_beam_in_um = None
         self.timeout = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         self.ch_diameters_size_list = self.get_channel_object("diameters_size_list",
@@ -59,7 +59,7 @@ class XRD1Aperture(AbstractNState):
 
         self.update_state(self.STATES.READY)
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         try:
@@ -75,7 +75,7 @@ class XRD1Aperture(AbstractNState):
             value = self.VALUES.UNKNOWN
         return value
 
-    @hwo_header_log
+    @trace_call_log
     def _set_value(self, value):
 
         tango_value = value.value
@@ -107,7 +107,7 @@ class XRD1Aperture(AbstractNState):
         finally:
             self.update_state(self.STATES.READY)
 
-    @hwo_header_log
+    @trace_call_log
     def initialise_values(self):
 
         try:

@@ -24,7 +24,7 @@ __license__ = "LGPLv3+"
 __category__ = "General"
 
 from mxcubecore.HardwareObjects.abstract.AbstractBeam import AbstractBeam
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1Beam(AbstractBeam):
@@ -32,7 +32,7 @@ class XRD1Beam(AbstractBeam):
 
         super(XRD1Beam, self).__init__(name)
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(XRD1Beam, self).init()
@@ -43,7 +43,7 @@ class XRD1Beam(AbstractBeam):
 
         self.aperture_diameter_update(self._aperture.get_value())
 
-    @hwo_header_log
+    @trace_call_log
     def aperture_diameter_update(self, size):
 
         if size == self._aperture.VALUES.UNKNOWN:
@@ -62,12 +62,12 @@ class XRD1Beam(AbstractBeam):
         self.evaluate_beam_info()
         self.re_emit_values()
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         return list(self.get_beam_info_dict().values())
 
-    @hwo_header_log
+    @trace_call_log
     def get_available_size(self):
 
         return {
@@ -76,12 +76,12 @@ class XRD1Beam(AbstractBeam):
                        if value.name != 'UNKNOWN']
         }
 
-    @hwo_header_log
+    @trace_call_log
     def set_value(self, value):
 
         self._aperture.set_value(self._aperture.VALUES[value])
 
-    @hwo_header_log
+    @trace_call_log
     def set_beam_position_on_screen(self, beam_x_y):
 
         self._beam_position_on_screen = tuple(beam_x_y)

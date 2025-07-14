@@ -37,7 +37,7 @@ from mxcubecore.HardwareObjects.abstract.AbstractMultiCollect import (
 from mxcubecore import HardwareRepository as HWR
 from mxcubecore.TaskUtils import task
 from mxcubecore.model.queue_model_objects import Sample, Crystal
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
@@ -68,7 +68,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         self.cmd_abort = None
         self.collection_id = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         self.setControlObjects(
@@ -119,7 +119,7 @@ class XRD1MultiCollect(AbstractMultiCollect, HardwareObject):
         self.emit("collectConnected", (True,))
         self.emit("collectReady", (True,))
 
-    @hwo_header_log
+    @trace_call_log
     def do_collect(self, owner, data_collect_parameters):
 
         try:

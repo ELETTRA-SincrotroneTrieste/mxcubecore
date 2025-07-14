@@ -30,7 +30,7 @@ import gevent
 
 from mxcubecore.HardwareObjects.abstract.AbstractTransmission \
     import AbstractTransmission
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1Transmission(AbstractTransmission):
@@ -42,7 +42,7 @@ class XRD1Transmission(AbstractTransmission):
         self.tolerance = None
         self.timeout = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(XRD1Transmission, self).init()
@@ -53,7 +53,7 @@ class XRD1Transmission(AbstractTransmission):
 
         self.update_state(self.STATES.READY)
 
-    @hwo_header_log
+    @trace_call_log
     def on_update(self, tango_val):
 
         if tango_val is None:
@@ -61,7 +61,7 @@ class XRD1Transmission(AbstractTransmission):
         else:
             self.update_value(self.get_transmission(tango_val))
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         try:
@@ -77,7 +77,7 @@ class XRD1Transmission(AbstractTransmission):
             value = None
         return value
 
-    @hwo_header_log
+    @trace_call_log
     def _set_value(self, value):
 
         attenuation = 100. - value
@@ -97,7 +97,7 @@ class XRD1Transmission(AbstractTransmission):
         finally:
             self.update_state(self.STATES.READY)
 
-    @hwo_header_log
+    @trace_call_log
     def get_transmission(self, attenuation):
         # Min function avoids transmission=0 which prevent to show no trasmission value
         # (i.e. "- %") in frontend

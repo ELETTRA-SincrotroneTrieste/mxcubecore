@@ -28,7 +28,7 @@ import gevent
 
 from mxcubecore.BaseHardwareObjects import HardwareObjectState
 from mxcubecore.HardwareObjects.abstract.AbstractEnergy import AbstractEnergy
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1Energy(AbstractEnergy):
@@ -55,7 +55,7 @@ class XRD1Energy(AbstractEnergy):
         self.timeout = None
         self.last_value = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(XRD1Energy, self).init()
@@ -76,7 +76,7 @@ class XRD1Energy(AbstractEnergy):
             ),
         )
 
-    @hwo_header_log
+    @trace_call_log
     def get_actual_energy(self, value):
         if value < self.get_limits()[0] or value > self.get_limits()[1]:
             value = self.last_value
@@ -84,11 +84,11 @@ class XRD1Energy(AbstractEnergy):
             self.last_value = value
         return value
 
-    @hwo_header_log
+    @trace_call_log
     def _update_value(self, value=None):
         self.update_value(None)
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         try:
@@ -111,7 +111,7 @@ class XRD1Energy(AbstractEnergy):
 
         return value
 
-    @hwo_header_log
+    @trace_call_log
     def _set_value(self, value):
         try:
             if self.get_state() == HardwareObjectState.BUSY:
@@ -155,7 +155,7 @@ class XRD1Energy(AbstractEnergy):
             raise e
         return value
 
-    @hwo_header_log
+    @trace_call_log
     def abort(self):
 
         try:

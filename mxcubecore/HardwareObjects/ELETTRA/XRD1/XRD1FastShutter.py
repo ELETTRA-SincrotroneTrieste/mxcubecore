@@ -28,7 +28,7 @@ import gevent
 import PyTango
 
 from mxcubecore.HardwareObjects.abstract.AbstractShutter import AbstractShutter
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1FastShutter(AbstractShutter):
@@ -39,7 +39,7 @@ class XRD1FastShutter(AbstractShutter):
         self.ch_shutter_state = None
         self.timeout = None  # [s]
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(XRD1FastShutter, self).init()
@@ -53,7 +53,7 @@ class XRD1FastShutter(AbstractShutter):
 
         self.update_state(self.STATES.READY)
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         try:
@@ -68,7 +68,7 @@ class XRD1FastShutter(AbstractShutter):
             value = self.value_to_enum(None)
         return value
 
-    @hwo_header_log
+    @trace_call_log
     def _set_value(self, value):
 
         tango_value = value.value

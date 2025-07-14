@@ -25,7 +25,7 @@ __category__ = "General"
 
 import PyTango
 from mxcubecore.HardwareObjects.abstract.AbstractActuator import AbstractActuator
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1Cryo(AbstractActuator):
@@ -37,7 +37,7 @@ class XRD1Cryo(AbstractActuator):
         super(XRD1Cryo, self).__init__(name)
         self.ch_gas_temperature = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(XRD1Cryo, self).init()
@@ -49,7 +49,7 @@ class XRD1Cryo(AbstractActuator):
 
         self.update_state(self.STATES.READY)
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         try:

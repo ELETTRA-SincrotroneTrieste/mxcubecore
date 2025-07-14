@@ -29,7 +29,7 @@ from typing import Tuple
 
 from ispyb.sqlalchemy import BLSession
 
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 from mxcubecore.BaseHardwareObjects import HardwareObject
 import mxcubecore.HardwareRepository as HWR
 from mxcubecore.model.queue_model_objects import PathTemplate, DataCollection
@@ -68,7 +68,7 @@ class ElettraSession(HardwareObject):
 
     # Framework-2 method, inherited from HardwareObject and called
     # by the framework after the object has been initialized.
-    @hwo_header_log
+    @trace_call_log
     def init(self):
         self.synchrotron_name = self.get_property("synchrotron_name")
         self.beamline_name = self.get_property("beamline_name")

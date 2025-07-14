@@ -32,7 +32,7 @@ import subprocess
 import gevent
 
 from mxcubecore.BaseHardwareObjects import HardwareObject
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1OfflineProcessing(HardwareObject):
@@ -40,22 +40,22 @@ class XRD1OfflineProcessing(HardwareObject):
     def __init__(self, name):
         HardwareObject.__init__(self, name)
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
         pass
 
-    @hwo_header_log
+    @trace_call_log
     def execute_fastdp(self, params_dict):
         pass
 
-    @hwo_header_log
+    @trace_call_log
     def execute_autoproc(self, params_dict):
         pass
 
-    @hwo_header_log
+    @trace_call_log
     def execute_adxv(self, params_dict):
         pass
 
-    @hwo_header_log
+    @trace_call_log
     def create_autoproc_input(self, params_dict):
         pass

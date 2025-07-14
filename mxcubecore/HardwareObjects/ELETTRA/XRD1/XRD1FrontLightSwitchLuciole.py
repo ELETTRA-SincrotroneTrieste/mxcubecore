@@ -25,7 +25,7 @@ __category__ = "General"
 
 import PyTango
 from mxcubecore.HardwareObjects.abstract.AbstractNState import AbstractNState
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1FrontLightSwitchLuciole(AbstractNState):
@@ -35,7 +35,7 @@ class XRD1FrontLightSwitchLuciole(AbstractNState):
         self.ch_light_enabling_ch1 = None
         self.ch_light_enabling_ch2 = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(XRD1FrontLightSwitchLuciole, self).init()
@@ -56,7 +56,7 @@ class XRD1FrontLightSwitchLuciole(AbstractNState):
 
         self.update_state(self.STATES.READY)
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         try:
@@ -73,7 +73,7 @@ class XRD1FrontLightSwitchLuciole(AbstractNState):
             raise ValueError(err_msg)
         return value
 
-    @hwo_header_log
+    @trace_call_log
     def _set_value(self, value):
 
         self.update_state(self.STATES.BUSY)

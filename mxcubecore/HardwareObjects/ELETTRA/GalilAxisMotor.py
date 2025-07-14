@@ -27,7 +27,7 @@ import PyTango
 import gevent
 
 from mxcubecore.HardwareObjects.abstract.AbstractMotor import AbstractMotor
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class GalilAxisMotor(AbstractMotor):
@@ -53,7 +53,7 @@ class GalilAxisMotor(AbstractMotor):
         self.ch_velocity = None
         self.timeout = None  # [s]
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(GalilAxisMotor, self).init()
@@ -73,7 +73,7 @@ class GalilAxisMotor(AbstractMotor):
 
         self._tolerance = self.ch_accuracy.get_value()
 
-    @hwo_header_log
+    @trace_call_log
     def is_limit_sw_triggered(self, state, notify_ui=False):
         tango_status = self.ch_status.get_value().strip()
         # If limit switch triggered
@@ -88,7 +88,7 @@ class GalilAxisMotor(AbstractMotor):
             return True
         return False
 
-    @hwo_header_log
+    @trace_call_log
     def _update_state(self, tango_state=None):
         if tango_state is None:
             try:

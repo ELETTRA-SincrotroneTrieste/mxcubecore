@@ -26,7 +26,7 @@ __category__ = "General"
 import PyTango
 
 from mxcubecore.HardwareObjects.abstract.AbstractFlux import AbstractFlux
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1Flux(AbstractFlux):
@@ -38,7 +38,7 @@ class XRD1Flux(AbstractFlux):
         super(XRD1Flux, self).__init__(name)
         self.ch_beam_flux = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(XRD1Flux, self).init()
@@ -47,7 +47,7 @@ class XRD1Flux(AbstractFlux):
         # SIGNALS CONNECTIONS
         self.connect(self.ch_beam_flux, "update", self.update_value)
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         try:
@@ -62,7 +62,7 @@ class XRD1Flux(AbstractFlux):
             raise ValueError(err_msg)
         return value
 
-    @hwo_header_log
+    @trace_call_log
     def _set_value(self, value):
 
         raise NotImplementedError(f"Flux can not be set to {value}")

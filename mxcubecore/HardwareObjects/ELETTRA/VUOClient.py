@@ -27,7 +27,7 @@ from urllib.parse import urljoin
 import yaml
 from mxcubecore.BaseHardwareObjects import HardwareObject
 from mxcubecore import HardwareRepository as HWR
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 from vuo.client import Client
 from vuo.exceptions import VUOException
@@ -53,7 +53,7 @@ class VUOClient(HardwareObject):
         self.beamline_name = None
         self.base_result_url = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         self.beamline_name = HWR.beamline.session.beamline_name

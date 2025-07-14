@@ -27,7 +27,7 @@ import PyTango
 import gevent
 
 from mxcubecore.HardwareObjects.abstract.AbstractNState import AbstractNState
-from mxcubecore import  hwo_header_log
+from mxcubecore import  trace_call_log
 from mxcubecore import HardwareRepository as HWR
 
 
@@ -55,7 +55,7 @@ class XRD1HeadOrientation(AbstractNState):
         self.cmd_abort_sample_orientation = None
         self.timeout = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(XRD1HeadOrientation, self).init()
@@ -78,11 +78,11 @@ class XRD1HeadOrientation(AbstractNState):
         self.update_value()
         self.update_state()
 
-    @hwo_header_log
+    @trace_call_log
     def set_sample_triclinic(self):
         HWR.beamline.diffractometer.kappa.set_value(-30.00)
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         try:

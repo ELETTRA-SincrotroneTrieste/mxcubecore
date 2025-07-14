@@ -28,7 +28,7 @@ import PyTango
 
 from mxcubecore.HardwareObjects.abstract.AbstractDetector import AbstractDetector
 from mxcubecore.BaseHardwareObjects import HardwareObjectState
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class XRD1DetectorPilatus(AbstractDetector):
@@ -55,7 +55,7 @@ class XRD1DetectorPilatus(AbstractDetector):
         self.cmd_reset = None
         self.file_suffix = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(XRD1DetectorPilatus, self).init()
@@ -91,7 +91,7 @@ class XRD1DetectorPilatus(AbstractDetector):
 
         return file_name
 
-    @hwo_header_log
+    @trace_call_log
     def get_state(self):
 
         try:
@@ -110,18 +110,18 @@ class XRD1DetectorPilatus(AbstractDetector):
             raise ValueError(err_msg)
         return state
 
-    @hwo_header_log
+    @trace_call_log
     def has_shutterless(self):
 
         return True
 
-    @hwo_header_log
+    @trace_call_log
     def prepare_acquisition(self, *args, **kwargs):
 
         # TODO evaluate whether make some Pilatus configuration
         return
 
-    @hwo_header_log
+    @trace_call_log
     def start_acquisition(self):
 
         try:
@@ -139,7 +139,7 @@ class XRD1DetectorPilatus(AbstractDetector):
             time.sleep(1)
             self.update_state()
 
-    @hwo_header_log
+    @trace_call_log
     def stop_acquisition(self):
 
         try:
@@ -157,7 +157,7 @@ class XRD1DetectorPilatus(AbstractDetector):
             time.sleep(1)
             self.update_state()
 
-    @hwo_header_log
+    @trace_call_log
     def restart(self) -> None:
 
         try:

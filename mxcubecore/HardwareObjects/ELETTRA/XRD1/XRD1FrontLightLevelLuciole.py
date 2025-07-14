@@ -27,7 +27,7 @@ import PyTango
 import gevent
 
 from mxcubecore.HardwareObjects.abstract.AbstractMotor import AbstractMotor
-from mxcubecore import  hwo_header_log
+from mxcubecore import  trace_call_log
 
 
 class XRD1FrontLightLevelLuciole(AbstractMotor):
@@ -39,7 +39,7 @@ class XRD1FrontLightLevelLuciole(AbstractMotor):
         self.ch_light_level_ch1 = None
         self.ch_light_level_ch2 = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(XRD1FrontLightLevelLuciole, self).init()
@@ -54,7 +54,7 @@ class XRD1FrontLightLevelLuciole(AbstractMotor):
 
         self.update_state(self.STATES.READY)
 
-    @hwo_header_log
+    @trace_call_log
     def get_value(self):
 
         try:
@@ -71,7 +71,7 @@ class XRD1FrontLightLevelLuciole(AbstractMotor):
             raise ValueError(err_msg)
         return value
 
-    @hwo_header_log
+    @trace_call_log
     def _set_value(self, value):
 
         value = int(value)

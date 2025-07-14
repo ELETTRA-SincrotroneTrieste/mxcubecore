@@ -58,7 +58,7 @@ from sqlalchemy.sql.expression import func, or_
 from mxcubecore.BaseHardwareObjects import HardwareObject
 from mxcubecore import HardwareRepository as HWR
 import mxcubecore.model.lims_model as model
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 # TODO replace this import with the module installation!
 """
@@ -84,7 +84,7 @@ class ISPyBAPIClient(HardwareObject):
         self.ispyb_api_conn = None
         self.SqlAlchemySession = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
         """
         Init method declared by HardwareObject.
@@ -117,7 +117,7 @@ class ISPyBAPIClient(HardwareObject):
             self.log.exception(f"Unexpected error occurred")
             return
 
-    @hwo_header_log
+    @trace_call_log
     def get_db_session(self):
         db_sess: DBSession = self.SqlAlchemySession()
         try:

@@ -32,7 +32,7 @@ from gevent.lock import Semaphore
 
 from mxcubecore.HardwareObjects.GenericDiffractometer import GenericDiffractometer
 from mxcubecore import HardwareRepository as HWR
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 class TwoClickCentringState(int, enum.Enum):
@@ -84,7 +84,7 @@ class XRD1Diffractometer(GenericDiffractometer):
         self.waiting_for_click = False
         self.click_lock = Semaphore()
 
-    @hwo_header_log
+    @trace_call_log
     def init(self) -> bool:
 
         super(XRD1Diffractometer, self).init()
@@ -156,24 +156,24 @@ class XRD1Diffractometer(GenericDiffractometer):
         """
         return self.motor_hwobj_dict.get("phi")
 
-    @hwo_header_log
+    @trace_call_log
     def get_centring_state(self):
         tango_value = self.ch_centering_state.get_value()
         return TwoClickCentringState(tango_value)
 
-    @hwo_header_log
+    @trace_call_log
     def update_beam_center_x(self, x=None):
         if x is None:
             x = self.ch_beam_center_x.get_value()
         self.beam_center_x = x
 
-    @hwo_header_log
+    @trace_call_log
     def update_beam_center_y(self, y=None):
         if y is None:
             y = self.ch_beam_center_y.get_value()
         self.beam_center_y = y
 
-    @hwo_header_log
+    @trace_call_log
     def convert_pixels_to_mm(self, x, y):
         # Pixels received are already scaled (from the frontend). For example, the 'x'
         # range will be [0, image width] and the 'y' range will be [0, image height],
@@ -191,7 +191,7 @@ class XRD1Diffractometer(GenericDiffractometer):
 
         return x_mm, y_mm
 
-    @hwo_header_log
+    @trace_call_log
     def image_clicked(self, x, y, xi=None, yi=None):
         with self.click_lock:
             if self.waiting_for_click:

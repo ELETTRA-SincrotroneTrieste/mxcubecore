@@ -25,7 +25,7 @@ __category__ = "General"
 
 
 from mxcubecore.HardwareObjects.abstract.AbstractMachineInfo import AbstractMachineInfo
-from mxcubecore import hwo_header_log
+from mxcubecore import trace_call_log
 
 
 TOPUP_STATUS = {1: 'OFF', 2: 'ON', 4: 'WARMUP', 8: 'RUNNING', 16: 'FAULT'}
@@ -42,7 +42,7 @@ class MachineInfoElettra(AbstractMachineInfo):
         self.ch_filling_mode = None
         self.ch_lifetime = None
 
-    @hwo_header_log
+    @trace_call_log
     def init(self):
 
         super(MachineInfoElettra, self).init()
