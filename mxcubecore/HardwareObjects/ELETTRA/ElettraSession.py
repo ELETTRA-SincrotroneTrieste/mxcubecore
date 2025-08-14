@@ -123,6 +123,12 @@ class ElettraSession(HardwareObject):
 
         self._session_id = sess_id
 
+    def set_session_start_date(self, start_date_str):
+        self.session_start_date = start_date_str
+
+    def get_session_start_date(self):
+        return self.session_start_date
+
     @property
     def raw_data_folder_name(self):
         # It returns the investigation instead of "rawdata_folder_name" attribute because in
@@ -130,7 +136,7 @@ class ElettraSession(HardwareObject):
         # it is based on ESRF? path template
         return self.get_investigation()
 
-    @hwo_header_log
+    @trace_call_log
     def get_investigation(self):
 
         if self.proposal_number and self.visit_num is not None:
@@ -138,7 +144,7 @@ class ElettraSession(HardwareObject):
         else:
             raise ValueError('"Proposal number" or "visit number" undefined')
 
-    @hwo_header_log
+    @trace_call_log
     def prepare_directories(self, proposal_info):
         try:
             HWR.beamline.lims.lims_rest.vuo_client.get_user_experiments(
@@ -153,11 +159,11 @@ class ElettraSession(HardwareObject):
             )
             self.log.info(f'Investigation "{self.get_investigation()}" created in VUO')
 
-    @hwo_header_log
+    @trace_call_log
     def get_base_data_directory(self):
         return os.path.join(self.base_directory, self.get_investigation())
 
-    @hwo_header_log
+    @trace_call_log
     def get_path_with_proposal_as_root(self, path: str) -> str:
         """
         Strips the begining of the path so that it starts with
@@ -169,7 +175,7 @@ class ElettraSession(HardwareObject):
 
         return path.split(self.base_directory)[1]
 
-    @hwo_header_log
+    @trace_call_log
     def get_base_image_directory(self):
         """
         :returns: The base path for images.
@@ -181,7 +187,7 @@ class ElettraSession(HardwareObject):
         except ValueError:
             return ""
 
-    @hwo_header_log
+    @trace_call_log
     def get_base_process_directory(self):
         """
         :returns: The base path for procesed data.
@@ -193,7 +199,7 @@ class ElettraSession(HardwareObject):
         except ValueError:
             return ""
 
-    @hwo_header_log
+    @trace_call_log
     def get_image_directory(self, sub_dir: str = "") -> str:
         """
         Returns the full path to images
@@ -214,7 +220,7 @@ class ElettraSession(HardwareObject):
             )
         return directory
 
-    @hwo_header_log
+    @trace_call_log
     def get_process_directory(self, sub_dir: str = "") -> str:
         """
         Returns the full path to processed data,
@@ -237,7 +243,7 @@ class ElettraSession(HardwareObject):
             )
         return directory
 
-    @hwo_header_log
+    @trace_call_log
     def get_full_path(self, subdir: str = "", tag: str = "") -> Tuple[str, str]:
         """
         Returns the full path to both image and processed data.
@@ -256,7 +262,7 @@ class ElettraSession(HardwareObject):
 
         return self.get_image_directory(subdir), self.get_process_directory(subdir)
 
-    @hwo_header_log
+    @trace_call_log
     def get_default_prefix(self, sample_data_node=None, generic_name=False):
         """
         Returns the default prefix, using sample data such as the
@@ -291,7 +297,7 @@ class ElettraSession(HardwareObject):
         #
         return prefix
 
-    @hwo_header_log
+    @trace_call_log
     def get_default_subdir(self, sample_data: dict) -> str:
         """
         Gets the default sub-directory based on sample information
@@ -316,7 +322,7 @@ class ElettraSession(HardwareObject):
 
         return subdir.replace(":", "-")
 
-    @hwo_header_log
+    @trace_call_log
     def get_archive_directory(self):
         archive_directory = os.path.join(
             self["file_info"].get_property("archive_base_directory"),
@@ -324,7 +330,7 @@ class ElettraSession(HardwareObject):
         )
         return archive_directory
 
-    @hwo_header_log
+    @trace_call_log
     def get_proposal(self):
         """
         :returns: The proposal, 'local-user' if no proposal is
@@ -335,7 +341,7 @@ class ElettraSession(HardwareObject):
         proposal = f"{self.proposal_code} - {self.get_investigation()}"
         return proposal
 
-    @hwo_header_log
+    @trace_call_log
     def is_inhouse(self, proposal_code=None, proposal_number=None):
         """
         Determines if a given proposal is considered to be inhouse.
@@ -361,7 +367,7 @@ class ElettraSession(HardwareObject):
         else:
             return False
 
-    @hwo_header_log
+    @trace_call_log
     def set_user_group(self, group_name):
         """
         :param group_name: Name of user group
@@ -369,7 +375,7 @@ class ElettraSession(HardwareObject):
         """
         self.user_group = str(group_name)
 
-    @hwo_header_log
+    @trace_call_log
     def get_group_name(self):
         """
         :returns: Name of user group
@@ -377,7 +383,7 @@ class ElettraSession(HardwareObject):
         """
         return self.user_group
 
-    @hwo_header_log
+    @trace_call_log
     def clear_session(self):
         self._session_id = None
         self.visit_num = None

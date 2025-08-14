@@ -83,7 +83,7 @@ class VUOClient(HardwareObject):
             self.log.exception(msg)
             raise e
 
-    @hwo_header_log
+    @trace_call_log
     def dc_link(self, dc_id):
         """
         Get the LIMS link the data collection with id <id>.
@@ -108,7 +108,7 @@ class VUOClient(HardwareObject):
 
         return url
 
-    @hwo_header_log
+    @trace_call_log
     def get_dc(self, dc_id):
         """
         Get data collection with id <dc_id>
@@ -121,7 +121,7 @@ class VUOClient(HardwareObject):
 
         return dc_dict
 
-    @hwo_header_log
+    @trace_call_log
     def get_dc_thumbnail(self, image_id):
         """
         Get the image data for image with id <image_id>
