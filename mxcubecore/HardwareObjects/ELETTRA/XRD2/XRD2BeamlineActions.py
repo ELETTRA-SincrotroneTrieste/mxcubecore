@@ -22,9 +22,12 @@ class SetLoadedSample(AnnotatedCommand):
         super().__init__(*args)
 
     def set_loaded_sample(self, data: SampleLocation) -> None:
-        logging.getLogger("user_level_log").info("Forcing loaded sample to %s:%s",
-                                                 data.sample_position, data.sample_position)
-        HWR.beamline.sample_changer.force_loaded_sample(f"{data.sample_position}:{data.sample_position}")
+        logging.getLogger("user_level_log").info(
+            "Forcing loaded sample to %i:%i", data.sample_position, data.sample_position
+        )
+        HWR.beamline.sample_changer.force_loaded_sample(
+            f"{data.sample_position}:{data.sample_position}"
+        )
 
 
 class XRD2BeamlineActions(BeamlineActions):
