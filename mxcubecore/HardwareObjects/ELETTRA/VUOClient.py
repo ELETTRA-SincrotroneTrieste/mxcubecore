@@ -55,7 +55,6 @@ class VUOClient(HardwareObject):
 
     @trace_call_log
     def init(self):
-
         self.beamline_name = HWR.beamline.session.beamline_name
         self.tag = HWR.beamline.session.tag
         try:
@@ -76,10 +75,10 @@ class VUOClient(HardwareObject):
 
         try:
             self.vuo_client = Client(user, password)
-            msg = f"User \"{user}\" has been authenticated by VUO"
+            msg = f'User "{user}" has been authenticated by VUO'
             self.log.info(msg)
         except VUOException as e:
-            msg = f"User \"{user}\" has not been authenticated by VUO"
+            msg = f'User "{user}" has not been authenticated by VUO'
             self.log.exception(msg)
             raise e
 
@@ -95,7 +94,6 @@ class VUOClient(HardwareObject):
         url = None
 
         if self.base_result_url is not None:
-
             path = "/dc/visit/{pcode}{pnumber}-{visit_num}/id/{dc_id}"
             path = path.format(
                 pcode=HWR.beamline.session.proposal_code,

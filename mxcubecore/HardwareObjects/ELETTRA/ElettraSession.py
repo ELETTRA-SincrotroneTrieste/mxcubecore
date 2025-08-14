@@ -116,7 +116,6 @@ class ElettraSession(HardwareObject):
 
     @session_id.setter
     def session_id(self, sess_id: int):
-
         # Each time the session change the "visit_number" must change
         db_session: BLSession = HWR.beamline.lims.get_session_by_id(sess_id)
         self.visit_num = db_session.visit_number
@@ -138,7 +137,6 @@ class ElettraSession(HardwareObject):
 
     @trace_call_log
     def get_investigation(self):
-
         if self.proposal_number and self.visit_num is not None:
             return f"{self.proposal_number}-{self.visit_num}"
         else:
