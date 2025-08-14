@@ -36,7 +36,6 @@ from mxcubecore import trace_call_log
 
 
 class PilatusTangoDetector(AbstractDetector):
-
     map_to_mxcube_state = {
         PyTango.DevState.INIT: AbstractDetector.STATES.BUSY,
         PyTango.DevState.ON: AbstractDetector.STATES.READY,
@@ -83,7 +82,9 @@ class PilatusTangoDetector(AbstractDetector):
         self._roi_modes_list = eval(self.get_property("roi_mode_list", "[]"))
 
         # min total, max total, rate")
-        self._exposure_time_limits = eval(self.get_property("exposure_time_limits", "[0.084, 3600, 0.084]"))
+        self._exposure_time_limits = eval(
+            self.get_property("exposure_time_limits", "[0.084, 3600, 0.084]")
+        )
 
         self.detect_type = self.get_property("type")
         self.has_shut_less = self.get_property("hasShutterless")
@@ -92,15 +93,23 @@ class PilatusTangoDetector(AbstractDetector):
         self.ch_state = self.get_channel_object("state", optional=False)
         self.ch_status = self.get_channel_object("status", optional=False)
         self.ch_threshold = self.get_channel_object("threshold", optional=False)
-        self.ch_last_image_taken = self.get_channel_object("last_image_taken", optional=False)
+        self.ch_last_image_taken = self.get_channel_object(
+            "last_image_taken", optional=False
+        )
         self.ch_file_prefix = self.get_channel_object("file_prefix", optional=False)
         self.ch_file_dir = self.get_channel_object("file_dir", optional=False)
         self.ch_num_frames = self.get_channel_object("num_frames", optional=False)
-        self.ch_num_exposure_per_frame = self.get_channel_object("num_exposure_per_frame", optional=False)
+        self.ch_num_exposure_per_frame = self.get_channel_object(
+            "num_exposure_per_frame", optional=False
+        )
         self.ch_trigger_mode = self.get_channel_object("trigger_mode", optional=False)
         self.ch_exposure_time = self.get_channel_object("exposure_time", optional=False)
-        self.ch_exposure_period = self.get_channel_object("exposure_period", optional=False)
-        self.ch_file_start_num = self.get_channel_object("file_start_num", optional=False)
+        self.ch_exposure_period = self.get_channel_object(
+            "exposure_period", optional=False
+        )
+        self.ch_file_start_num = self.get_channel_object(
+            "file_start_num", optional=False
+        )
         self.ch_mx_settings = self.get_channel_object("mx_settings", optional=False)
 
         self.cmd_init = self.get_command_object("init")
@@ -110,7 +119,7 @@ class PilatusTangoDetector(AbstractDetector):
 
         # SIGNALS CONNECTIONS
         self.connect(self.ch_state, "update", self._update_state)
-        #self.connect(self.ch_status, "update", self.update_status)
+        # self.connect(self.ch_status, "update", self.update_status)
 
         self.update_state()
 
@@ -139,12 +148,10 @@ class PilatusTangoDetector(AbstractDetector):
         try:
             tango_state = self.ch_state.get_value()
             state = self.map_to_mxcube_state.get(tango_state, self.STATES.UNKNOWN)
-            self.log.info(
-                f'Read the state of the Pilatus (it\'s "{state.name}")'
-            )
+            self.log.info(f'Read the state of the Pilatus (it\'s "{state.name}")')
         except PyTango.DevFailed:
             err_msg = (
-                f'Failed to read the state of the Pilatus'
+                f"Failed to read the state of the Pilatus"
                 f' from the attribute "{self.ch_state.attribute_name}"'
                 f' of the tango device "{self.ch_state.device_name}" '
             )
@@ -176,15 +183,22 @@ class PilatusTangoDetector(AbstractDetector):
             self.log.info("Pilatus please_init()")
             self.cmd_init()
         except PyTango.DevFailed as e:
-            if e.args[0].desc == 'Pilatus reply: 1 ERR access denied':
-                raise RuntimeError("*** Detector CAMSERVER not responding! Access Denied - Ask BL staff to restart it ***")
-            elif e.args[0].desc == 'Pilatus wrong reply':
+            if e.args[0].desc == "Pilatus reply: 1 ERR access denied":
+                raise RuntimeError(
+                    "*** Detector CAMSERVER not responding! Access Denied - Ask BL staff to restart it ***"
+                )
+            elif e.args[0].desc == "Pilatus wrong reply":
                 if 0 <= retry <= 90:
-                    self.log.info("- Pilatus wait_and_init ...wrong reply since %d s" % int(retry))
+                    self.log.info(
+                        "- Pilatus wait_and_init ...wrong reply since %d s" % int(retry)
+                    )
                     gevent.sleep(5)
                     self.wait_and_init(retry=retry + 5)
                 else:
-                    raise RuntimeError("*** Detector fixThreshold Tango Error: %s ***" % traceback.format_exc())
+                    raise RuntimeError(
+                        "*** Detector fixThreshold Tango Error: %s ***"
+                        % traceback.format_exc()
+                    )
         except:
             self.log.exception("Error occurred during the Pilatus initialization")
 
@@ -204,42 +218,66 @@ class PilatusTangoDetector(AbstractDetector):
                 self.log.info("Pilatus NOT changing Threshold (%d eV)" % thresholdP6M)
             return thresholdP6M, True
         except PyTango.DevFailed as e:
-            if e.args[0].desc == 'Pilatus reply: 1 ERR access denied':
-                raise RuntimeError("*** Detector CAMSERVER not responding! Access Denied - Ask BL staff to restart it ***")
-            elif e.args[0].desc == 'Pilatus wrong reply':
+            if e.args[0].desc == "Pilatus reply: 1 ERR access denied":
+                raise RuntimeError(
+                    "*** Detector CAMSERVER not responding! Access Denied - Ask BL staff to restart it ***"
+                )
+            elif e.args[0].desc == "Pilatus wrong reply":
                 if 0 <= retry <= 90:
-                    self.log.info("- Pilatus fixThreshold ...wrong reply since %d s" % int(retry))
+                    self.log.info(
+                        "- Pilatus fixThreshold ...wrong reply since %d s" % int(retry)
+                    )
                     gevent.sleep(5)
                     self.fix_threshold(energy, fix, retry=retry + 5)
-                elif self.ch_state.get_value() == 'INIT':
-                    self.log.info("...PilatusXM is in a fake INIT? trying to recover with a new Init... hope not to end up in a loop")
+                elif self.ch_state.get_value() == "INIT":
+                    self.log.info(
+                        "...PilatusXM is in a fake INIT? trying to recover with a new Init... hope not to end up in a loop"
+                    )
                     self.wait_and_init(retry=-1)
                     gevent.sleep(30)
                     self.fix_threshold(energy, fix, retry=1)
                 else:
-                    raise RuntimeError("*** Detector fixThreshold Tango Error: %s ***" % traceback.format_exc())
-            elif (e.args[0].desc == 'Threshold has not been set') and ('ALARM' in self.ch_status.get_value()):
-                self.log.info("...PilatusXM is in ALARM - trying to recover with an Init... hope not to end up in a loop")
+                    raise RuntimeError(
+                        "*** Detector fixThreshold Tango Error: %s ***"
+                        % traceback.format_exc()
+                    )
+            elif (e.args[0].desc == "Threshold has not been set") and (
+                "ALARM" in self.ch_status.get_value()
+            ):
+                self.log.info(
+                    "...PilatusXM is in ALARM - trying to recover with an Init... hope not to end up in a loop"
+                )
                 self.wait_and_init(retry=-1)
                 gevent.sleep(30)
                 self.fix_threshold(energy, fix, retry=1)
-            elif e.args[0].desc == 'Threshold has not been set':
+            elif e.args[0].desc == "Threshold has not been set":
                 self.log.info("Pilatus Threshold not set - doing it now!")
                 thresholdP6M = round(0.70 * energy, 0)
                 self.ch_threshold.set_value(thresholdP6M)
                 return thresholdP6M, False
             else:
-                raise RuntimeError("*** Detector fixThreshold Tango Error: %s ***" % traceback.format_exc())
+                raise RuntimeError(
+                    "*** Detector fixThreshold Tango Error: %s ***"
+                    % traceback.format_exc()
+                )
 
     @trace_call_log
     def please_init(self, energy):
-        thresholdP6M, thresholdState = self.fix_threshold(energy=1000 * energy, fix=False, retry=1)
+        thresholdP6M, thresholdState = self.fix_threshold(
+            energy=1000 * energy, fix=False, retry=1
+        )
         self.user_log.warning("Setting Detector Threshold (%d eV)" % thresholdP6M)
         self.wait_and_init(retry=1)
         if thresholdState:
-            raise RuntimeError("*** Detector Initialization! - Current threshold is %d eV ***" % thresholdP6M)
+            raise RuntimeError(
+                "*** Detector Initialization! - Current threshold is %d eV ***"
+                % thresholdP6M
+            )
         else:
-            raise RuntimeError("*** Detector Initialization! - Threshold set NOW to %d eV ***" % thresholdP6M)
+            raise RuntimeError(
+                "*** Detector Initialization! - Threshold set NOW to %d eV ***"
+                % thresholdP6M
+            )
 
     @trace_call_log
     def generate_header(self, start_angle, delta_angle):
@@ -248,23 +286,32 @@ class PilatusTangoDetector(AbstractDetector):
         # TODO valutare se ha senso mettere tutto sotto try e ripetere un tot di volte o eventualmente o
         #  magari si possono ripetere solo le chiamate agli strumenti
         try:
-            header_info.append("Wavelength %.4f" % self.bl_control.energy.getCurrentWavelength())
+            header_info.append(
+                "Wavelength %.4f" % self.bl_control.energy.getCurrentWavelength()
+            )
         except:
-            self.log.exception('Error occurred generating the header for the Pilatus'
-                               ' images')
+            self.log.exception(
+                "Error occurred generating the header for the Pilatus images"
+            )
         try:
-            header_info.append("Detector_distance %.5f" % (self.bl_control.detector_distance.getPosition() * 0.001))
+            header_info.append(
+                "Detector_distance %.5f"
+                % (self.bl_control.detector_distance.getPosition() * 0.001)
+            )
         except:
-            self.log.exception('Error occurred generating the header for the Pilatus'
-                               f' ({self.detect_type}) images')
+            self.log.exception(
+                "Error occurred generating the header for the Pilatus"
+                f" ({self.detect_type}) images"
+            )
         try:
             # TODO doveremmo usare il beam position reale ?
-            #beampos = self.bl_control.beam_info.get_beam_position()
-            #header_info.append("Beam_xy %.3f %.3f" % (beampos[0],beampos[1]))
+            # beampos = self.bl_control.beam_info.get_beam_position()
+            # header_info.append("Beam_xy %.3f %.3f" % (beampos[0],beampos[1]))
             header_info.append("Beam_xy %.3f %.3f" % (1257, 1331))
         except:
-            self.log.exception("Error occurred generating the header for the"
-                               " Pilatus images")
+            self.log.exception(
+                "Error occurred generating the header for the Pilatus images"
+            )
 
         try:
             header_info.append("Start_angle %.3f" % start_angle)
@@ -272,8 +319,9 @@ class PilatusTangoDetector(AbstractDetector):
             header_info.append("Detector_2theta 0.000")
             header_info.append("Flux Temperature:_%.1f_K" % self.get_cryo_temperature())
         except:
-            self.log.exception(f'Error occurred generating the header for the "Pilatus'
-                               f' images')
+            self.log.exception(
+                f'Error occurred generating the header for the "Pilatus images'
+            )
 
         try:
             mot_positions = self.bl_control.diffractometer.get_positions()
@@ -284,9 +332,9 @@ class PilatusTangoDetector(AbstractDetector):
             header_info.append("Omega_increment %.3f" % delta_angle)
             header_info.append("Oscillation_axis OMEGA")
         except:
-            self.log.exception(f'Error occurred generating the header for the "Pilatus'
-                               f' images')
-
+            self.log.exception(
+                f'Error occurred generating the header for the "Pilatus images'
+            )
 
         return header_info
 
@@ -310,13 +358,17 @@ class PilatusTangoDetector(AbstractDetector):
                 written_file_dir = self.ch_file_dir.get_value()
                 if file_dir == written_file_dir:
                     break
-                self.log.warning(f"Pilatus {self.ch_file_dir.attribute_name}"
-                                 f" anomalous behaviour: "
-                                 f"[read: {written_file_dir}, "
-                                 f"written: {file_dir}] ")
+                self.log.warning(
+                    f"Pilatus {self.ch_file_dir.attribute_name}"
+                    f" anomalous behaviour: "
+                    f"[read: {written_file_dir}, "
+                    f"written: {file_dir}] "
+                )
             except PyTango.DevFailed:
-                self.log.exception(f"Error occurred setting the attribute \"{self.ch_file_dir.attribute_name}\""
-                                   f"of the tango device \"{self.ch_file_dir.device_name}\") to {file_dir}")
+                self.log.exception(
+                    f'Error occurred setting the attribute "{self.ch_file_dir.attribute_name}"'
+                    f'of the tango device "{self.ch_file_dir.device_name}") to {file_dir}'
+                )
                 continue
 
     @trace_call_log
@@ -329,26 +381,44 @@ class PilatusTangoDetector(AbstractDetector):
             self.reset()
 
     @trace_call_log
-    def prepare_acquisition(self, data_collect_parameters, start_angle, delta_angle, prefix_in = None, mesh_scan = False):
+    def prepare_acquisition(
+        self,
+        data_collect_parameters,
+        start_angle,
+        delta_angle,
+        prefix_in=None,
+        mesh_scan=False,
+    ):
         self.ensure_detector_is_ready()
         try:
-            total_exp_time = data_collect_parameters["oscillation_sequence"][0]["exposure_time"]
-            num_frames = data_collect_parameters["oscillation_sequence"][0]["number_of_images"]
+            total_exp_time = data_collect_parameters["oscillation_sequence"][0][
+                "exposure_time"
+            ]
+            num_frames = data_collect_parameters["oscillation_sequence"][0][
+                "number_of_images"
+            ]
             if prefix_in is None:
-                prefix = data_collect_parameters['fileinfo']["prefix"]
+                prefix = data_collect_parameters["fileinfo"]["prefix"]
             else:
                 prefix = prefix_in
-            file_start_num = data_collect_parameters["oscillation_sequence"][0]["start_image_number"]
-            run_number = data_collect_parameters['fileinfo']["run_number"]
-            image_path = "%s/%d" % (data_collect_parameters['fileinfo']["directory"], run_number)
-            file_prefix = prefix+"_"+str(run_number)
-            file_prefix = file_prefix.replace(":","-")
-            image_path = image_path.replace(":","-")
+            file_start_num = data_collect_parameters["oscillation_sequence"][0][
+                "start_image_number"
+            ]
+            run_number = data_collect_parameters["fileinfo"]["run_number"]
+            image_path = "%s/%d" % (
+                data_collect_parameters["fileinfo"]["directory"],
+                run_number,
+            )
+            file_prefix = prefix + "_" + str(run_number)
+            file_prefix = file_prefix.replace(":", "-")
+            image_path = image_path.replace(":", "-")
 
             self.ensure_detector_is_ready()  # TODO è veramente necessario ?????
 
             self.ch_file_prefix.set_value(file_prefix)
-            image_path = image_path.replace("//", "/").replace("/net/xrd2-pilatus/", "/ramdisk/")
+            image_path = image_path.replace("//", "/").replace(
+                "/net/xrd2-pilatus/", "/ramdisk/"
+            )
             self.change_file_dir_force(image_path)
             self.ch_num_frames.set_value(num_frames)
             gevent.sleep(0.1)
@@ -373,9 +443,13 @@ class PilatusTangoDetector(AbstractDetector):
             # Problem when doing fine slicing -- make the exposure period shorther by 0.0006
             # also exposuretime (0.003 readout - 0.006)
             if mesh_scan:
-                self.ch_exposure_time.set_value(single_exp_time - 0.014) # 0.0136 # da manuale: 0.013
+                self.ch_exposure_time.set_value(
+                    single_exp_time - 0.014
+                )  # 0.0136 # da manuale: 0.013
             else:
-                self.ch_exposure_time.set_value(single_exp_time - 0.0036) # da manuale: 0.034
+                self.ch_exposure_time.set_value(
+                    single_exp_time - 0.0036
+                )  # da manuale: 0.034
             gevent.sleep(0.1)
             self.ch_exposure_period.set_value(single_exp_time - 0.0006)
             gevent.sleep(0.1)
@@ -396,19 +470,25 @@ class PilatusTangoDetector(AbstractDetector):
         try:
             self.cmd_start_acq()
             timeout = 2 * self.ch_state.polling / 1000
-            with gevent.Timeout(timeout, TimeoutError(
-                f'Timed out. The Pilatus state has not changed into "BUSY"'
-                f' after {timeout} sec from the "start" command'
+            with gevent.Timeout(
+                timeout,
+                TimeoutError(
+                    f'Timed out. The Pilatus state has not changed into "BUSY"'
+                    f' after {timeout} sec from the "start" command'
                 ),
             ):
-                self.log.debug('Waiting the Pilatus to change the state into'
-                               ' "BUSY" after "start" command')
-                while self._state != self.STATES.BUSY: # TODO se non funziona cambia in self.get_state()
+                self.log.debug(
+                    "Waiting the Pilatus to change the state into"
+                    ' "BUSY" after "start" command'
+                )
+                while (
+                    self._state != self.STATES.BUSY
+                ):  # TODO se non funziona cambia in self.get_state()
                     gevent.sleep(self.ch_state.polling / 1000)
-            self.log.info(f'The Pilatus has been started successfully')
+            self.log.info(f"The Pilatus has been started successfully")
         except PyTango.DevFailed:
             err_msg = (
-                f'Failed to start acquisition of the Pilatus'
+                f"Failed to start acquisition of the Pilatus"
                 f' calling the command "{self.cmd_stop_acq.command}"'
                 f' of the tango device "{self.cmd_stop_acq.device_name}"'
             )
@@ -423,18 +503,25 @@ class PilatusTangoDetector(AbstractDetector):
         try:
             self.cmd_stop_acq()
             timeout = 2 * self.ch_state.polling / 1000
-            with gevent.Timeout(timeout, TimeoutError(
-                f'Timed out. The Pilatus state has not changed into "READY"'
-                f' after {timeout} sec from the stop command'
-            )):
-                self.log.debug(f'Waiting the Pilatus to change the state into'
-                               f' "READY" after stop command')
-                while self._state != self.STATES.READY:  # TODO se non funziona cambia in self.get_state()
+            with gevent.Timeout(
+                timeout,
+                TimeoutError(
+                    f'Timed out. The Pilatus state has not changed into "READY"'
+                    f" after {timeout} sec from the stop command"
+                ),
+            ):
+                self.log.debug(
+                    f"Waiting the Pilatus to change the state into"
+                    f' "READY" after stop command'
+                )
+                while (
+                    self._state != self.STATES.READY
+                ):  # TODO se non funziona cambia in self.get_state()
                     gevent.sleep(self.ch_state.polling / 1000)
-            self.log.info(f'The Pilatus has been stopped successfully')
+            self.log.info(f"The Pilatus has been stopped successfully")
         except PyTango.DevFailed:
             err_msg = (
-                f'Failed to stop the acquisition of the Pilatus'
+                f"Failed to stop the acquisition of the Pilatus"
                 f' calling the command "{self.cmd_stop_acq.command}"'
                 f' of the tango device "{self.cmd_stop_acq.device_name}"'
             )
@@ -450,18 +537,25 @@ class PilatusTangoDetector(AbstractDetector):
         try:
             self.cmd_reset()
             timeout = 2 * self.ch_state.polling / 1000
-            with gevent.Timeout(timeout, TimeoutError(
-                f'Timed out. The Pilatus state has not changed into "READY"'
-                f' after {timeout} sec from the reset command'
-            )):
-                self.log.debug(f'Waiting the Pilatus to change the state into'
-                               f' "READY" after reset command')
-                while self._state != self.STATES.READY:  # TODO se non funziona cambia in self.get_state()
+            with gevent.Timeout(
+                timeout,
+                TimeoutError(
+                    f'Timed out. The Pilatus state has not changed into "READY"'
+                    f" after {timeout} sec from the reset command"
+                ),
+            ):
+                self.log.debug(
+                    f"Waiting the Pilatus to change the state into"
+                    f' "READY" after reset command'
+                )
+                while (
+                    self._state != self.STATES.READY
+                ):  # TODO se non funziona cambia in self.get_state()
                     gevent.sleep(self.ch_state.polling / 1000)
-            self.log.info(f'The Pilatus has been reset successfully')
+            self.log.info(f"The Pilatus has been reset successfully")
         except PyTango.DevFailed:
             err_msg = (
-                f'Failed to reset the Pilatus'
+                f"Failed to reset the Pilatus"
                 f' calling the command "{self.cmd_stop_acq.command}"'
                 f' of the tango device "{self.cmd_stop_acq.device_name}"'
             )
@@ -471,4 +565,3 @@ class PilatusTangoDetector(AbstractDetector):
 
     def restart(self) -> None:
         raise NotImplementedError
-

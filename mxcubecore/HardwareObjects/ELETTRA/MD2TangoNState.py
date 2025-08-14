@@ -28,26 +28,28 @@ from mxcubecore import trace_call_log
 
 
 class MD2TangoNState(AbstractNState):
-
     def __init__(self, name):
         super().__init__(name)
         self.ch_state = None
 
     @trace_call_log
     def init(self):
-
         super().init()
         self.ch_state = self.get_channel_object("state")
 
         # SIGNALS CONNECTIONS
-        self.connect(self.ch_state, "update",
-                     lambda tg_value: self.update_value(self.value_to_enum(tg_value)))
+        self.connect(
+            self.ch_state,
+            "update",
+            lambda tg_value: self.update_value(self.value_to_enum(tg_value)),
+        )
 
         self.update_state(self.STATES.READY)
 
     @trace_call_log
     def get_value(self):
         value = self.value_to_enum(self.ch_state.get_value())
-        self.log.debug(f'Read the state of "{self.username}" '
-                       f'(value: {self.value_to_enum(value)})')
+        self.log.debug(
+            f'Read the state of "{self.username}" (value: {self.value_to_enum(value)})'
+        )
         return value

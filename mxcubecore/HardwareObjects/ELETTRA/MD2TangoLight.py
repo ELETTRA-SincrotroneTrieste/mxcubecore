@@ -28,7 +28,6 @@ from mxcubecore import trace_call_log
 
 
 class MD2TangoBackLight(AbstractMotor):
-
     unit = "%"
 
     def __init__(self, name):
@@ -37,7 +36,6 @@ class MD2TangoBackLight(AbstractMotor):
 
     @trace_call_log
     def init(self):
-
         super().init()
         self.ch_light_level = self.get_channel_object("light_level")
 
@@ -50,12 +48,10 @@ class MD2TangoBackLight(AbstractMotor):
     def get_value(self) -> float:
         value = self.ch_light_level.get_value()
         self.log.debug(
-            f'Read the level of the "{self.username}" '
-            f'(value: {value} {self.unit})'
+            f'Read the level of the "{self.username}" (value: {value} {self.unit})'
         )
         return value
 
     @trace_call_log
     def _set_value(self, value: float):
         self.cmd_set_motor_position(value)
-

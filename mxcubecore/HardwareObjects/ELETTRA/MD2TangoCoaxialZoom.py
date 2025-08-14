@@ -35,7 +35,6 @@ from mxcubecore import trace_call_log
 
 
 class MD2TangoCoaxialZoom(AbstractMotor):
-
     map_to_mxcube_state = {
         "INIT": AbstractMotor.STATES.UNKNOWN,
         "ON": AbstractMotor.STATES.READY,
@@ -68,8 +67,11 @@ class MD2TangoCoaxialZoom(AbstractMotor):
         self.cmd_abort = self.get_command_object("abort")
 
         # SIGNALS CONNECTIONS
-        self.connect(self.ch_zoom_value, 'update',
-                     lambda tg_value: self.update_value(self.value_to_enum(tg_value)))
+        self.connect(
+            self.ch_zoom_value,
+            "update",
+            lambda tg_value: self.update_value(self.value_to_enum(tg_value)),
+        )
 
         thread = Thread(target=self.poll)
         thread.daemon = True
@@ -86,20 +88,18 @@ class MD2TangoCoaxialZoom(AbstractMotor):
                 self.update_state()
             except (ValueError, PyTango.DevFailed):
                 self.log.exception(
-                    'Error occurred during the polling of the zoom state'
+                    "Error occurred during the polling of the zoom state"
                 )
             except Exception:
                 self.log.exception(
-                    'Unexpected error occurred during the polling of the zoom state'
+                    "Unexpected error occurred during the polling of the zoom state"
                 )
 
     @trace_call_log
     def get_state(self) -> AbstractMotor.STATES:
         tango_state = self.cmd_get_motor_state(self.motor_name)
         state = self.map_to_mxcube_state.get(tango_state, self.STATES.UNKNOWN)
-        self.log.debug(
-            f'Read the state of "{self.username}" (value: "{state.name}")'
-        )
+        self.log.debug(f'Read the state of "{self.username}" (value: "{state.name}")')
         return state
 
     @trace_call_log

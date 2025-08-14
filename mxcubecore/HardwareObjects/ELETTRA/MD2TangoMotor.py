@@ -92,21 +92,21 @@ class MD2TangoMotor(AbstractMotor):
                 self.update_value()
             except (ValueError, PyTango.DevFailed):
                 self.log.exception(
-                    'Error occurred during the polling of the motor position'
+                    "Error occurred during the polling of the motor position"
                 )
             except Exception:
                 self.log.exception(
-                    'Unexpected error occurred during the polling of the motor position'
+                    "Unexpected error occurred during the polling of the motor position"
                 )
             try:
                 self.update_state()
             except (ValueError, PyTango.DevFailed):
                 self.log.exception(
-                    'Error occurred during the polling of the motor state'
-                                   )
+                    "Error occurred during the polling of the motor state"
+                )
             except Exception:
                 self.log.exception(
-                    'Unexpected error occurred during the polling of the motor state'
+                    "Unexpected error occurred during the polling of the motor state"
                 )
 
     @trace_call_log

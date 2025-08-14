@@ -45,11 +45,10 @@ class XRD2SampleChangerMaint(HardwareObject):
         self.sample_changer = None
 
     def init(self):
-
         self.sample_changer = self.get_object_by_role("sample_changer")
 
         # SIGNALS CONNECTIONS
-        self.connect(self.sample_changer, 'scInfoChanged', self._update_global_state)
+        self.connect(self.sample_changer, "scInfoChanged", self._update_global_state)
 
     # TODO spostare da un'altra parte
     # def _doRestartMX3(self):
@@ -113,7 +112,7 @@ class XRD2SampleChangerMaint(HardwareObject):
     @trace_call_log
     def _update_global_state(self):
         state_dict, cmd_state, message = self.get_global_state()
-        #self.log.debug("State_dict: %s, cmd_state: %s, message: %s", str(state_dict), str(cmd_state), message)
+        # self.log.debug("State_dict: %s, cmd_state: %s, message: %s", str(state_dict), str(cmd_state), message)
         self.emit("globalStateChanged", (state_dict, cmd_state, message))
 
     @trace_call_log
@@ -134,10 +133,10 @@ class XRD2SampleChangerMaint(HardwareObject):
         return state_dict, cmd_state, message
 
     def get_cmd_info(self):
-        """ return information about existing commands for this object
-               the information is organized as a list
-               with each element contains
-               [ cmd_name,  display_name, category ]
+        """return information about existing commands for this object
+        the information is organized as a list
+        with each element contains
+        [ cmd_name,  display_name, category ]
         """
         """ [cmd_id, cmd_display_name, nb_args, cmd_category, description ] """
         cmd_list = [
@@ -147,20 +146,19 @@ class XRD2SampleChangerMaint(HardwareObject):
                     ["defrost", "Defrost", "Actions"],
                     ["park", "Park Robot", "Actions"],
                     ["unpark", "Unpark Robot", "Actions"],
-                ]
+                ],
             ],
             [
                 "EMERGENCY Actions - !!! ASK BL STAFF BEFORE CLICKING !!!",
                 [
                     ["trash2S", "Trash Stucked Samples", "Actions"],
                     ["reset", "Reset", "Actions"],
-                ]
+                ],
             ],
         ]
         return cmd_list
 
     def send_command(self, cmdname, args=None):
-
         if cmdname in ["defrost"]:
             self._do_defrost()
 
@@ -176,7 +174,7 @@ class XRD2SampleChangerMaint(HardwareObject):
         if cmdname in ["reset"]:
             self._do_reset()
             # TODO
-            #self.sample_changer.wait_states([SampleChangerState.Ready], 30)
+            # self.sample_changer.wait_states([SampleChangerState.Ready], 30)
 
         self._update_global_state()
         return True

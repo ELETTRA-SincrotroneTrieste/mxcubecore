@@ -31,6 +31,7 @@ from mxcubecore import trace_call_log
 
 # TODO controlla gli enum
 
+
 @enum.unique
 class CryoRunMode(enum.Enum):
     StartUp: 0  # Initialising
@@ -44,7 +45,7 @@ class CryoRunMode(enum.Enum):
 
 @enum.unique
 class CryoPhase(enum.Enum):
-    Stop: -99  #fake phase for comparison
+    Stop: -99  # fake phase for comparison
     Restart: -1
     Ramp: 0  # Temperature changed at a controlled rate to final value
     Cool: 1  # Temperature changed as fast as possible to final value
@@ -57,7 +58,7 @@ class CryoPhase(enum.Enum):
     SavePrgrm: 8
     PurgeSoak: 9
     Ramp_Wait: 10  # During a Ramp, device is waiting for temperature to 'catch up'
-                   # with set point
+    # with set point
 
 
 @enum.unique
@@ -82,7 +83,6 @@ class CryoAlarm(enum.Enum):
 
 
 class Cryostream1000STangoCryo(AbstractActuator):
-
     unit = "K"
 
     map_to_mxcube_state = {
@@ -93,10 +93,9 @@ class Cryostream1000STangoCryo(AbstractActuator):
         CryoRunMode.SetUp.value: AbstractActuator.STATES.WARNING,
         CryoRunMode.ShutdownOK.value: AbstractActuator.STATES.OFF,
         CryoRunMode.ShutdownFail.value: AbstractActuator.STATES.FAULT,
-        }
+    }
 
     def __init__(self, name):
-
         super().__init__(name)
         self.ch_gas_temp = None
         self.ch_target_temp = None
@@ -117,7 +116,6 @@ class Cryostream1000STangoCryo(AbstractActuator):
 
     @trace_call_log
     def init(self):
-
         super().init()
         self.ch_gas_temp = self.get_channel_object("gas_temp")
         self.ch_target_temp = self.get_channel_object("target_temp")
@@ -141,10 +139,8 @@ class Cryostream1000STangoCryo(AbstractActuator):
             self.ch_run_mode,
             "update",
             lambda tg_value: self.update_state(
-                self.map_to_mxcube_state.get(
-                    tg_value, AbstractActuator.STATES.UNKNOWN
-                )
-            )
+                self.map_to_mxcube_state.get(tg_value, AbstractActuator.STATES.UNKNOWN)
+            ),
         )
 
         self.update_state(self.STATES.READY)
@@ -154,22 +150,24 @@ class Cryostream1000STangoCryo(AbstractActuator):
     @trace_call_log
     def get_value(self) -> float:
         value = self.ch_gas_temp.get_value()
-        self.log.debug(f"Read the gas temperature of the \"{self.username}\" "
-                       f"(value: \"{value} {self.unit}\")")
+        self.log.debug(
+            f'Read the gas temperature of the "{self.username}" '
+            f'(value: "{value} {self.unit}")'
+        )
         return value
 
     @trace_call_log
     def _set_value(self, value: float):
-        if self.ch_run_mode.get_value() in [CryoRunMode.ShutdownFail.value,
-                                            CryoRunMode.ShutdownOK.value]:
+        if self.ch_run_mode.get_value() in [
+            CryoRunMode.ShutdownFail.value,
+            CryoRunMode.ShutdownOK.value,
+        ]:
             self.restart()
         if self.ch_phase_id.get_value() == CryoPhase.RAMP.value:
             self.hold()
         while self.ch_phase_id.get_value() != CryoPhase.RAMP.value:
             self.cmd_ramp([self.default_rate, value])
-            self.user_log.warning(
-                f"{self.username}: Ramping to {value} {self.unit}"
-            )
+            self.user_log.warning(f"{self.username}: Ramping to {value} {self.unit}")
             gevent.sleep(self.ch_gas_temp.polling / 1000)
 
     @trace_call_log
@@ -190,10 +188,13 @@ class Cryostream1000STangoCryo(AbstractActuator):
     def restart(self):
         run_mode = self.ch_run_mode.get_value()
         if run_mode == CryoRunMode.ShutdownOK.value:
-            with gevent.Timeout(60, TimeoutError(
-                f'"{self.username}: RESTART FAILED. System not restarted after '
-                f'{self.timeout} sec'
-            )):
+            with gevent.Timeout(
+                60,
+                TimeoutError(
+                    f'"{self.username}: RESTART FAILED. System not restarted after '
+                    f"{self.timeout} sec"
+                ),
+            ):
                 while self.ch_run_mode.get_value() == CryoRunMode.ShutdownOK.value:
                     self.cmd_restart()
                     self.log.info(
@@ -204,9 +205,10 @@ class Cryostream1000STangoCryo(AbstractActuator):
                     run_mode = self.ch_run_mode.get_value()
                     self.log.info(
                         f"{self.username}: WAITING for the restart to complete (current"
-                        f" run mode: {CryoRunMode(run_mode).name})")
+                        f" run mode: {CryoRunMode(run_mode).name})"
+                    )
                     if run_mode == CryoRunMode.StartUpOK.value:
-                        self.log.warning(f'{self.username}: RESTART SUCCESSFUL!')
+                        self.log.warning(f"{self.username}: RESTART SUCCESSFUL!")
                         break
                     if run_mode == CryoRunMode.StartUpFail.value:
                         raise RuntimeError(
@@ -264,7 +266,7 @@ class Cryostream1000STangoCryo(AbstractActuator):
             )
         else:
             # TODO ??? perche error e perchè ripetere il comando ?
-            self.user_log.error(f'{self.username}: HOLDING current temperature!')
+            self.user_log.error(f"{self.username}: HOLDING current temperature!")
             while self.ch_phase_id.get_value() != CryoPhase.Hold.value:
                 self.cmd_hold()
                 gevent.sleep(self.ch_run_mode.polling / 1000)
@@ -276,8 +278,10 @@ class Cryostream1000STangoCryo(AbstractActuator):
     @trace_call_log
     def abort(self):
         self.user_log.warning(f"{self.username}: STOPPING system ...")
-        while self.ch_run_mode.get_value() not in [CryoRunMode.ShutdownOK.value,
-                                                   CryoRunMode.ShutdownFail.value]:
+        while self.ch_run_mode.get_value() not in [
+            CryoRunMode.ShutdownOK.value,
+            CryoRunMode.ShutdownFail.value,
+        ]:
             # TODO perchè ripetere il comando ?
             self.cmd_stop()
             gevent.sleep(self.ch_run_mode.polling / 1000)
