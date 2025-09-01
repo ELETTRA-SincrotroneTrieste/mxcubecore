@@ -29,7 +29,7 @@ import time
 import gevent
 
 from mxcubecore.BaseHardwareObjects import HardwareObject
-from mxcubecore.HardwareObjects.ELETTRA.XRD2 import XRD2SampleChanger
+from mxcubecore.HardwareObjects.ELETTRA.XRD2.XRD2SampleChanger import StaubliStates
 from mxcubecore.HardwareObjects.abstract.AbstractSampleChanger import SampleChangerState
 from mxcubecore.TaskUtils import task
 from mxcubecore import trace_call_log
@@ -50,18 +50,6 @@ class XRD2SampleChangerMaint(HardwareObject):
         # SIGNALS CONNECTIONS
         self.connect(self.sample_changer, "scInfoChanged", self._update_global_state)
 
-    # TODO spostare da un'altra parte
-    # def _doRestartMX3(self):
-    #     """
-    #     Kill and restart mxcube-server
-    #
-    #     :returns: None
-    #     :rtype: None
-    #     """
-    #     os.setsid()
-    #     Popen('{}/../../../restart_mxcube3.sh'.format(os.path.dirname(os.path.abspath(__file__))), shell=True, stdout=PIPE, stderr=PIPE)
-    #     raise RuntimeError("*** MXCuBE has been killed & restarted - Please Refresh the browser page! ***")
-
     @trace_call_log
     def _do_reset(self):
         """
@@ -69,28 +57,13 @@ class XRD2SampleChangerMaint(HardwareObject):
         """
         self.sample_changer.reset()
 
-    def _do_trash2S(self):
-        """
-        Trash (DROP!) samples opening (both) gripper(s) in EXChange point
-
-        """
-        self.sample_changer._do_trash2S()
-
     @trace_call_log
     def _do_defrost(self):
         """
         Defrost sample changer
 
         """
-        self.sample_changer._do_defrost()
-
-    @trace_call_log
-    def _do_park(self):
-        """
-        Park sample changer
-
-        """
-        self.sample_changer._do_park()
+        self.sample_changer.defrost()
 
     @trace_call_log
     def _do_unpark(self):
@@ -98,7 +71,22 @@ class XRD2SampleChangerMaint(HardwareObject):
         Unpark sample changer
 
         """
-        self.sample_changer._do_unpark()
+        self.sample_changer.unpark()
+
+    @trace_call_log
+    def _do_park(self):
+        """
+        Park sample changer
+
+        """
+        self.sample_changer.park()
+
+    def _do_trash2S(self):
+        """
+        Trash (DROP!) samples opening (both) gripper(s) in EXChange point
+
+        """
+        self.sample_changer.trash2S()
 
     @trace_call_log
     def _do_change_gripper(self):
@@ -112,24 +100,21 @@ class XRD2SampleChangerMaint(HardwareObject):
     @trace_call_log
     def _update_global_state(self):
         state_dict, cmd_state, message = self.get_global_state()
-        # self.log.debug("State_dict: %s, cmd_state: %s, message: %s", str(state_dict), str(cmd_state), message)
+        self.log.debug("State_dict: %s, cmd_state: %s, message: %s", str(state_dict), str(cmd_state), message)
         self.emit("globalStateChanged", (state_dict, cmd_state, message))
 
     @trace_call_log
     def get_global_state(self):
-        sc_state = self.sample_changer.get_state()
+        sc_hw_state = self.sample_changer.get_hw_state()
         cmd_state = {
-            "defrost": sc_state == SampleChangerState.Ready,
-            "park": sc_state in [SampleChangerState.Ready, SampleChangerState.Exchange],
-            "unpark": sc_state == SampleChangerState.Parked,
-            "trash2S": sc_state == SampleChangerState.Alarm,
-            "reset": sc_state == SampleChangerState.Alarm,
+            "defrost": not self.sample_changer.is_executing_task() and sc_hw_state == StaubliStates.IDLE,
+            "park": not self.sample_changer.is_executing_task() and sc_hw_state in [StaubliStates.IDLE, StaubliStates.EXCHANGE],
+            "unpark": not self.sample_changer.is_executing_task() and sc_hw_state == StaubliStates.PARKED,
+            "trash2S": not self.sample_changer.is_executing_task() and sc_hw_state == StaubliStates.ERROR,
+            "reset": not self.sample_changer.is_executing_task() and sc_hw_state == StaubliStates.ERROR,
         }
         state_dict = self.sample_changer.sc_info
-        message = ""
-        print(f"AAAAAAAA cmd_state: {cmd_state}")
-        print(f"AAAAAAAA state_dict: {state_dict}")
-
+        message = self.sample_changer.get_message()
         return state_dict, cmd_state, message
 
     def get_cmd_info(self):
@@ -173,8 +158,6 @@ class XRD2SampleChangerMaint(HardwareObject):
 
         if cmdname in ["reset"]:
             self._do_reset()
-            # TODO
-            # self.sample_changer.wait_states([SampleChangerState.Ready], 30)
 
         self._update_global_state()
         return True
