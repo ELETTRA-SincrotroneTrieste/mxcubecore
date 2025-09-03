@@ -29,6 +29,7 @@ import time
 
 import PyTango
 import gevent
+from gevent.lock import Semaphore
 
 from mxcubecore.HardwareObjects.abstract.AbstractSampleChanger import *
 from mxcubecore.HardwareObjects.abstract.sample_changer import Container
@@ -47,8 +48,8 @@ class StaubliStates(enum.Enum):
     ENDING_MOUNT = SampleChangerState.Loading
     SWAPPING = SampleChangerState.Loading
     ENDING_SWAP = SampleChangerState.Loading
-    DEFROST = SampleChangerState.Moving
-    COOLDOWN = SampleChangerState.Moving
+    DEFROST = SampleChangerState.Disabled
+    COOLDOWN = SampleChangerState.Disabled
     UNPARKING = SampleChangerState.Moving
     PARKING = SampleChangerState.Moving
     PARKED = SampleChangerState.Disabled
@@ -158,7 +159,9 @@ class XRD2SampleChanger(SampleChanger):
         self.no_of_baskets = None
         self.no_of_samples_in_basket = None
         self.signal_wait_task = None
-        self._ena_hw_state_sync = True
+        self.state_change_lock = Semaphore()
+        self.ena_hw_state_sync = True
+        self.pin_detection_mismatched = False
         self.diffractometer = None
         self.lims = None
         self.last_pin_status_readtime = 0
@@ -234,8 +237,15 @@ class XRD2SampleChanger(SampleChanger):
         self._hw_state = StaubliStates.from_staubli_status(hw_status)
 
         self.log.debug(f"Sample changer current state: {self._hw_state.name}")
-        if self._ena_hw_state_sync:
-            self._set_state(state=self._hw_state.value)
+
+        with self.state_change_lock:
+            # Synchronize the sample changer HWO state with the Staubli (hw) state (only if sync enabled)
+            if self.ena_hw_state_sync:
+                self._set_state(state=self._hw_state.value)
+                if self._hw_state == StaubliStates.ERROR:
+                    self.message = hw_status.split("ERROR:")[1]
+                else:
+                    self.message = ""
 
     @property
     def _selected_basket(self):
@@ -315,67 +325,113 @@ class XRD2SampleChanger(SampleChanger):
                 sleep(1)
             return task_failed, task_log
 
+    @trace_call_log
     def force_loaded_sample(self, sample_location: str):
         try:
             basket, sample = sample_location.split(":")
             self._selected_basket = basket
             self._selected_sample = sample
-            self._ena_hw_state_sync = True
-            self._update_state()
         except:
             self.log.exception("Error occurred forcing loaded sample")
 
-    def defrost(self, wait: bool = True):
-        self._update_state()
-        if self._hw_state == StaubliStates.IDLE:
-            return self._execute_task(SampleChangerState.Moving, wait, self._do_defrost)
-        else:
-            err_msg = 'Defrost aborted! Sample changer must be in "IDLE" state (Current hw state: %s)'
+    @trace_call_log
+    def defrost(self):
+        if not self.is_state_in([StaubliStates.IDLE]):
+            err_msg = 'Defrost aborted! The sample changer hw state must be "IDLE" (Current hw state: %s)'
             self.user_log.error(err_msg, self._hw_state.name)
-
-    def unpark(self, wait: bool = True):
-        self._update_state()
-        if self._hw_state == StaubliStates.PARKED:
-            return self._execute_task(SampleChangerState.Moving, wait, self._do_unpark)
-        else:
-            err_msg = 'Unparking aborted! Sample changer must be in "PARKED" state (Current hw state: %s)'
-            self.user_log.error(err_msg, self._hw_state.name)
-
-    def park(self, wait: bool = True):
-        self._update_state()
-        if self._hw_state in [StaubliStates.IDLE, StaubliStates.EXCHANGE]:
-            return self._execute_task(SampleChangerState.Moving, wait, self._do_park)
-        else:
-            err_msg = 'Parking aborted! Sample changer must be in "IDLE" or "EXCHANGE" state (Current hw state: %s)'
-            self.user_log.error(err_msg, self._hw_state.name)
-
-    def trash2S(self, wait: bool = True):
-        self._update_state()
-        if self._hw_state == StaubliStates.ERROR:
-            self._ena_hw_state_sync = False
-            return self._execute_task(SampleChangerState.Moving, wait, self._do_trash2S)
-        else:
-            err_msg = 'Trashing aborted! Sample changer is not in "ERROR" state (Current hw state: %s)'
-            self.user_log.error(err_msg, self._hw_state.name)
+            return
+        self._set_state(SampleChangerState.Moving)
+        self.cmd_start_method("defrost")
+        self.log.info('"defrost" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+        sleep(1)
+        self._wait_method_execution(wait_only_if=[StaubliStates.DEFROST])
 
     @trace_call_log
-    def assert_not_charging(self):
-        # !!! Since we are using the AbstractSampleChanger implementation of load an unload method this method will be
-        # called to check the feasibility of the operation. The of the method name it is obviously misleading since we
-        # actually check the readiness for the mounting and unmount operations
-        # TODO propose to the mx3 community to replace `assert_not_charging` with somthing like these more general
-        #  `assert_ready_for_load` and `assert_ready_for_unload` methods (should be abstract)
+    def unpark(self):
+        if not self.is_state_in([StaubliStates.PARKED]):
+            err_msg = 'Unpark aborted! The sample changer hw state must be "PARKED" (Current hw state: %s)'
+            self.user_log.error(err_msg, self._hw_state.name)
+            return
+        self._set_state(SampleChangerState.Moving)
+        self.cmd_start_method("unpark")
+        self.log.info('"unpark" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+        sleep(1)
+        self._wait_method_execution()
 
-        self._update_state()
-        if not(self._hw_state in [StaubliStates.DEFROST, StaubliStates.COOLDOWN]
-               or (self._hw_state == StaubliStates.IDLE and not self.is_executing_task())):
-            err_msg = (
-                f'Sample can not be unloaded or loaded! Sample changer must be in "IDLE", "DEFROST" or "COOLDOWN" '
-                f'state (Current hw state: {self._hw_state.name}).'
-                f" Use the sample changer actions to manage it (click on the equipment tab)."
+    @trace_call_log
+    def park(self):
+        if not self.is_state_in([StaubliStates.IDLE, StaubliStates.EXCHANGE]):
+            err_msg = 'Park aborted! The sample changer hw state must be "IDLE" or "EXCHANGE"  (Current hw state: %s)'
+            self.user_log.error(err_msg, self._hw_state.name)
+            return
+        self._set_state(SampleChangerState.Moving)
+        self.cmd_start_method("park")
+        self.log.info('"park" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+        sleep(1)
+        self._wait_method_execution()
+
+    @trace_call_log
+    def trash2S(self):
+
+        """
+        These are the steps of the reset sequence:
+         - SET(FORCE_IDLE)
+         - go to SAF
+         - wait
+         - go to EXC
+        - SET(GRIPPER_OPEN)
+         - PAR
+         - UNP
+        """
+
+        if not self.is_state_in([StaubliStates.ERROR]):
+            err_msg = 'Trash aborted! The sample changer hw state must be "ERROR" (Current hw state: %s)'
+            self.user_log.error(err_msg, self._hw_state.name)
+            return
+
+        self.ena_hw_state_sync = False
+        try:
+            self._set_state(SampleChangerState.Disabled)
+            startTimestampRA = time.time()
+            recovery_time = 60
+            recovery_time = 10  # todo ripristina 60
+            self.cmd_start_method("force_idle")
+            self.log.info('"force_idle" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+            self._wait_method_execution()
+            self.cmd_start_method("safe_point")
+            self.log.info('"safe_point" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+            self._wait_method_execution()
+            sleep(5)
+            self.cmd_start_method("exchange_point")
+            self.log.info('"exchange_point" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+            self._wait_method_execution()
+            while recovery_time > 0:
+                self.user_log.error("!!! Gripper will drop pins in {} s !!!".format(recovery_time))
+                sleep(5)
+                recovery_time -= 5
+            self.cmd_start_method("write_samplechanger_gripper_open")
+            self.log.info(
+                '"write_samplechanger_gripper_open" execution request sent to the tango device: %s',
+                self.cmd_start_method.device_name
             )
-            self.user_log.error(err_msg)
-            raise RuntimeError(err_msg)
+            self._wait_method_execution()
+            self.park()
+            self.user_log.info("!!! Gripper will be ready soon... !!!")
+            self._wait_method_execution()
+            self.unpark()
+            self._wait_method_execution()
+
+            # TODO implementa store_robo_action
+            # self.lims.set_robot_action(dewarLocation=self.device.Basket_selected,
+            #         containerLocation=self.device.Sample_selected,
+            #         actionType='DISPOSE',
+            #         status='SUCCESS',
+            #         message='Trashing [last SWAP from {}:{} to {}:{}]'.format(self.device.Basket_to_swap, self.device.Sample_to_swap, self.device.Basket_selected, self.device.Sample_selected),
+            #         startTimestamp=startTimestampRA,
+            #         endTimestamp=time.time())
+        finally:
+            self.ena_hw_state_sync = True
+            self._update_state()
 
     @trace_call_log
     def get_loaded_sample(self):
@@ -385,27 +441,19 @@ class XRD2SampleChanger(SampleChanger):
             self.last_pin_status_value = self.get_pin_state()
         if not self.is_pin_detected():
             return None
-        if -1 in [self._selected_basket, self._selected_sample]:
-            err_msg = (
-                f"Pin detected but the sample address can not be retrieved from the executer "
-                f"(basketSelected = {self._selected_basket} - sampleSelected={self._selected_sample})"
-            )
-            if self._ena_hw_state_sync:
-                self._ena_hw_state_sync = False
-                self._set_state(SampleChangerState.Fault)
-                self.user_log.error("%s. Please assign manually the location of the mounted sample", err_msg)
-                self.log.error("%s. Please assign manually the location of the mounted sample", err_msg)
-            # raise RuntimeError(err_msg)
-        else:
-            print("AAAAAAAAA self._selected_basket, self._selected_sample")
-            print(self._selected_basket, self._selected_sample)
 
-            return self.get_component_by_address(
-                Container.Pin.get_sample_address(
-                    self._selected_basket, self._selected_sample
-                )
-            )
+        self.validate_pin_detection()
 
+        print("AAAAAAAAA self._selected_basket, self._selected_sample")
+        print(self._selected_basket, self._selected_sample)
+
+        return self.get_component_by_address(
+            Container.Pin.get_sample_address(
+                self._selected_basket, self._selected_sample
+            )
+        )
+
+    @trace_call_log
     def chained_load(self, sample_to_unload, sample_to_load):
         """
         Chain the unload of a sample with a load.
@@ -434,6 +482,57 @@ class XRD2SampleChanger(SampleChanger):
     #     return sample == self.get_loaded_sample()
 
     @trace_call_log
+    def load(self, sample=None, wait=True):
+        """
+        Load a sample.
+
+        Args:
+            sample (tuple): sample address on the form
+                            (component1, ... ,component_N-1, component_N)
+            wait (boolean): True to wait for load to complete False otherwise
+
+        Returns
+            (Object): Value returned by _execute_task either a Task or result of the
+                      operation
+        """
+        sample = self._resolve_component(sample)
+        self.assert_ready_for_load()
+        # Do a chained load in this case
+        if self.has_loaded_sample():
+            # Do a chained load in this case
+            if (sample is None) or (sample == self.get_loaded_sample()):
+                raise RuntimeError(
+                    "The sample "
+                    + str(self.get_loaded_sample().get_address())
+                    + " is already loaded"
+                )
+            return self.chained_load(self.get_loaded_sample(), sample)
+        return self._do_load(sample)
+
+    @trace_call_log
+    def unload(self, sample_slot=None, wait=True):
+        """
+        Unload sample to location sample_slot, unloads to the same slot as it
+        was loaded from if None is passed
+
+        Args:
+            sample_slot (tuple): sample address on the form
+                               (component1, ... ,component_N-1, component_N)
+            wait: If True wait for unload to finish otherwise return immediately
+
+        Returns:
+            (Object): Value returned by _execute_task either a Task or result of the
+                      operation
+        """
+        sample_slot = self._resolve_component(sample_slot)
+        self.assert_ready_for_unload()
+        # In case we have manually mounted we can command an unmount
+        if not self.has_loaded_sample():
+            raise Exception("No sample is loaded")
+        self._do_unload(sample_slot)
+
+
+    @trace_call_log
     def reset(self, wait=True):
         """
         Reset the sample changer.
@@ -445,14 +544,30 @@ class XRD2SampleChanger(SampleChanger):
                       operation
         """
 
-        self._update_state()
-        if self._hw_state == StaubliStates.ERROR:
-            self._ena_hw_state_sync = False
-            return self._execute_task(SampleChangerState.Resetting, wait, self._do_reset)
-        else:
+        if not self.is_state_in([StaubliStates.ERROR]):
             err_msg = "Parking aborted! Sample changer is not IDLE or EXCHANGE state (Current hw state: %s)"
             self.user_log.error(err_msg, self._hw_state.name)
+            return
 
+        self.ena_hw_state_sync = False
+        try:
+            self._set_state(SampleChangerState.Disabled)
+            self.cmd_start_method("write_samplechanger_gripper_open")
+            self.log.info('"write_samplechanger_gripper_open" execution request sent to the tango device: %s',
+                          self.cmd_start_method.device_name)
+            self._wait_method_execution()
+            self.cmd_start_method("force_idle")
+            self.log.info('"force_idle" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+            sleep(1)
+            self._wait_method_execution()
+            if self.ch_script_failed.get_value():
+                self.log.info(
+                    "--> SampleChangerElettra_XRD2 _doReset (re)setting samplechanger self.ch_script_failed.get_value() to FALSE"
+                )
+                self.ch_script_failed.set_value(False)
+        finally:
+            self.ena_hw_state_sync = True
+            self._update_state()
 
     @trace_call_log
     def _do_load(self, sample_location, wait=False):
@@ -657,83 +772,6 @@ class XRD2SampleChanger(SampleChanger):
             raise RuntimeError(
                 f"Timeout error occurred waiting sample changer defrosting in {self.operation}"
             )
-
-    @trace_call_log
-    def _do_defrost(self):
-        if self.get_state() == SampleChangerState.Ready:
-            self.cmd_start_method("defrost")
-            self.log.info('"defrost" command sent to the tango device %s', self.cmd_start_method.device_name)
-            sleep(1)
-            self._wait_method_execution(wait_only_if=[StaubliStates.DEFROST])
-        else:
-            err_msg = "Defrost aborted! Sample changer is not Ready (Current state: %s)"
-            self.user_log.error(err_msg, SampleChangerState.tostring(self.get_state()))
-
-    def _do_unpark(self):
-        self.cmd_start_method("unpark")
-        self.log.info('"unpark" command sent to the tango device %s', self.cmd_start_method.device_name)
-        sleep(1)
-        self._wait_method_execution()
-
-    @trace_call_log
-    def _do_park(self):
-        self.cmd_start_method("park")
-        self.log.info('"park" command sent to the tango device %s', self.cmd_start_method.device_name)
-        sleep(1)
-        self._wait_method_execution()
-
-    def _do_trash2S(self):
-        """
-        These are the steps of the reset sequence:
-         - SET(FORCE_IDLE)
-         - go to SAF
-         - wait
-         - go to EXC
-        - SET(GRIPPER_OPEN)
-         - PAR
-         - UNP
-        """
-
-        startTimestampRA = time.time()
-        recovery_time = 60
-        recovery_time = 10  # todo ripristina 60
-        self.cmd_start_method("force_idle")
-        self.log.info('"force_idle" command sent to the tango device %s', self.cmd_start_method.device_name)
-        self._wait_method_execution()
-        self.cmd_start_method("safe_point")
-        self.log.info('"safe_point" command sent to the tango device %s', self.cmd_start_method.device_name)
-        self._wait_method_execution()
-        sleep(5)
-        self.cmd_start_method("exchange_point")
-        self.log.info('"exchange_point" command sent to the tango device %s', self.cmd_start_method.device_name)
-        self._wait_method_execution()
-        while recovery_time > 0:
-            self.user_log.error(
-                "!!! Gripper will drop pins in {} s !!!".format(recovery_time)
-            )
-            sleep(5)
-            recovery_time -= 5
-        self.cmd_start_method("write_samplechanger_gripper_open")
-        self.log.info(
-            '"write_samplechanger_gripper_open" command sent to the tango device %s',
-            self.cmd_start_method.device_name
-        )
-        self._wait_method_execution()
-        self.park()
-        self.user_log.info("!!! Gripper will be ready soon... !!!")
-        self._wait_method_execution()
-        self.unpark()
-        self._wait_method_execution()
-
-        # TODO implementa store_robo_action
-        # self.lims.set_robot_action(dewarLocation=self.device.Basket_selected,
-        #         containerLocation=self.device.Sample_selected,
-        #         actionType='DISPOSE',
-        #         status='SUCCESS',
-        #         message='Trashing [last SWAP from {}:{} to {}:{}]'.format(self.device.Basket_to_swap, self.device.Sample_to_swap, self.device.Basket_selected, self.device.Sample_selected),
-        #         startTimestamp=startTimestampRA,
-        #         endTimestamp=time.time())
-        return
 
     def _do_abort(self):
         raise NotImplemented
@@ -962,20 +1000,43 @@ class XRD2SampleChanger(SampleChanger):
         return self.get_pin_state() == PinStatus.Detected
 
     @trace_call_log
+    def validate_pin_detection(self):
+        """Validate consistency between hardware pin detection and internal variable"""
+        if self.is_pin_detected() and -1 in [self._selected_basket, self._selected_sample]:
+            if not self.pin_detection_mismatched:
+                self.pin_detection_mismatched = True
+                err_msg = (
+                    f"Pin detected by hardware but sample address is not known"
+                    f"(basket={self._selected_basket}, sample={self._selected_sample})"
+                )
+                self.log.error(err_msg)
+                self.user_log.error(
+                    "%s. Please assign manually the location of the mounted sample using the beamline actions",
+                    err_msg
+                )
+                with self.state_change_lock:
+                    self.ena_hw_state_sync = False
+                    self.message = err_msg
+                    self._set_state(SampleChangerState.Fault)
+                raise RuntimeError(err_msg)
+        else:
+            if self.pin_detection_mismatched:
+                self.pin_detection_mismatched = False
+                self.ena_hw_state_sync = True
+                self._update_state()
+
+    @trace_call_log
+    def is_state_in(self, hw_states: list[StaubliStates]):
+        self._update_state()
+        for hw_state in hw_states:
+            if self.state == hw_state.value and self._hw_state == hw_state:
+                return True
+        else:
+            return False
+
+    @trace_call_log
     def get_hw_state(self):
         return self._hw_state
-
-    def _on_task_ended(self, task):
-        """What to do when task ended normally"""
-        try:
-            msg = f"Task ended. Return value: {task.get()}"
-            self.log.debug(msg)
-        except Exception as err:
-            msg = f"Error while executing sample changer task: {err}"
-            self.log.error(msg)
-        finally:
-            self._ena_hw_state_sync = True
-            self._update_state()
 
     def wait_hw_states(self, states_list: list, timeout=None):
         with Timeout(
@@ -983,6 +1044,28 @@ class XRD2SampleChanger(SampleChanger):
         ):
             while not self.get_hw_state() in states_list:
                 sleep(0.5)
+
+    @trace_call_log
+    def assert_ready_for_load(self):
+        if not self.is_state_in([StaubliStates.IDLE, StaubliStates.DEFROST, StaubliStates.COOLDOWN]):
+            err_msg = (
+                f'Sample can not be loaded! The sample changer hw state must be "IDLE", "DEFROST" or "COOLDOWN" '
+                f' (Current hw state: {self._hw_state.name}).'
+                f' Use the sample changer actions to manage it (click on the equipment tab).'
+            )
+            self.user_log.error(err_msg)
+            raise RuntimeError(err_msg)
+
+    @trace_call_log
+    def assert_ready_for_unload(self):
+        if not self.is_state_in([StaubliStates.IDLE, StaubliStates.DEFROST, StaubliStates.COOLDOWN]):
+            err_msg = (
+                f'Sample can not be unloaded! The sample changer hw state must be "IDLE", "DEFROST" or "COOLDOWN" '
+                f' (Current hw state: {self._hw_state.name}).'
+                f' Use the sample changer actions to manage it (click on the equipment tab).'
+            )
+            self.user_log.error(err_msg)
+            raise RuntimeError(err_msg)
 
     def is_powered(self):
         return True

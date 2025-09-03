@@ -95,7 +95,6 @@ class XRD2SampleChangerMaint(HardwareObject):
 
         """
         raise NotImplemented
-        self.sample_changer.change_gripper()
 
     @trace_call_log
     def _update_global_state(self):
