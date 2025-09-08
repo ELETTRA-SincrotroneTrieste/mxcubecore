@@ -33,8 +33,11 @@ from gevent.lock import Semaphore
 
 from mxcubecore.HardwareObjects.abstract.AbstractSampleChanger import *
 from mxcubecore.HardwareObjects.abstract.sample_changer import Container
+from mxcubecore.HardwareObjects.abstract.sample_changer.Sample import Sample
 from mxcubecore import HardwareRepository as HWR
 from mxcubecore import trace_call_log
+from mxcubeweb.routes import signals
+from mxcubeweb.routes.signals import loaded_sample_changed
 
 
 class StaubliStates(enum.Enum):
@@ -161,11 +164,12 @@ class XRD2SampleChanger(SampleChanger):
         self.signal_wait_task = None
         self.state_change_lock = Semaphore()
         self.ena_hw_state_sync = True
+        self.pin_detection_mismatch = False
         self.pin_detection_mismatched = False
         self.diffractometer = None
         self.lims = None
         self.last_pin_status_readtime = 0
-        self.last_pin_status_value = "0"
+        self.last_pin_status_value = PinStatus.NotDetected
         self.message = ""
         self.ch_basket_selected = None
         self.ch_sample_selected = None
@@ -328,9 +332,20 @@ class XRD2SampleChanger(SampleChanger):
     @trace_call_log
     def force_loaded_sample(self, sample_location: str):
         try:
-            basket, sample = sample_location.split(":")
-            self._selected_basket = basket
-            self._selected_sample = sample
+            if sample_location.strip() in [':','']:
+                self._selected_basket = -1
+                self._selected_sample = -1
+                self._reset_loaded_sample()
+            else:
+                basket, sample = sample_location.split(":")
+                self._selected_basket = basket
+                self._selected_sample = sample
+                sample_obj = self.get_component_by_address(
+                    Container.Pin.get_sample_address(
+                        self._selected_basket, self._selected_sample
+                    )
+                )
+                self._set_loaded_sample(sample_obj)
         except:
             self.log.exception("Error occurred forcing loaded sample")
 
@@ -342,7 +357,7 @@ class XRD2SampleChanger(SampleChanger):
             return
         self._set_state(SampleChangerState.Moving)
         self.cmd_start_method("defrost")
-        self.log.info('"defrost" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+        self.log.info('"defrost" execution request sent to the tango device "%s"', self.cmd_start_method.device_name)
         sleep(1)
         self._wait_method_execution(wait_only_if=[StaubliStates.DEFROST])
 
@@ -354,7 +369,7 @@ class XRD2SampleChanger(SampleChanger):
             return
         self._set_state(SampleChangerState.Moving)
         self.cmd_start_method("unpark")
-        self.log.info('"unpark" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+        self.log.info('"unpark" execution request sent to the tango device "%s"', self.cmd_start_method.device_name)
         sleep(1)
         self._wait_method_execution()
 
@@ -366,7 +381,7 @@ class XRD2SampleChanger(SampleChanger):
             return
         self._set_state(SampleChangerState.Moving)
         self.cmd_start_method("park")
-        self.log.info('"park" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+        self.log.info('"park" execution request sent to the tango device "%s"', self.cmd_start_method.device_name)
         sleep(1)
         self._wait_method_execution()
 
@@ -396,24 +411,21 @@ class XRD2SampleChanger(SampleChanger):
             recovery_time = 60
             recovery_time = 10  # todo ripristina 60
             self.cmd_start_method("force_idle")
-            self.log.info('"force_idle" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+            self.log.info('"force_idle" execution request sent to the tango device "%s"', self.cmd_start_method.device_name)
             self._wait_method_execution()
             self.cmd_start_method("safe_point")
-            self.log.info('"safe_point" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+            self.log.info('"safe_point" execution request sent to the tango device "%s"', self.cmd_start_method.device_name)
             self._wait_method_execution()
             sleep(5)
             self.cmd_start_method("exchange_point")
-            self.log.info('"exchange_point" execution request sent to the tango device: %s', self.cmd_start_method.device_name)
+            self.log.info('"exchange_point" execution request sent to the tango device "%s"', self.cmd_start_method.device_name)
             self._wait_method_execution()
             while recovery_time > 0:
                 self.user_log.error("!!! Gripper will drop pins in {} s !!!".format(recovery_time))
                 sleep(5)
                 recovery_time -= 5
             self.cmd_start_method("write_samplechanger_gripper_open")
-            self.log.info(
-                '"write_samplechanger_gripper_open" execution request sent to the tango device: %s',
-                self.cmd_start_method.device_name
-            )
+            self.log.info('"write_samplechanger_gripper_open" execution request sent to the tango device "%s"',self.cmd_start_method.device_name)
             self._wait_method_execution()
             self.park()
             self.user_log.info("!!! Gripper will be ready soon... !!!")
@@ -439,19 +451,23 @@ class XRD2SampleChanger(SampleChanger):
             # Check pin_status at 1Hz
             self.last_pin_status_readtime = time.time()
             self.last_pin_status_value = self.get_pin_state()
-        if not self.is_pin_detected():
+
+        self.handle_state_on_mismatch()
+
+        if self.last_pin_status_value == PinStatus.NotDetected:
             return None
 
-        self.validate_pin_detection()
+        loaded_sample = super().get_loaded_sample()
+
+        if self.last_pin_status_value == PinStatus.Detected and loaded_sample is None:
+            return None
 
         print("AAAAAAAAA self._selected_basket, self._selected_sample")
         print(self._selected_basket, self._selected_sample)
+        print("AAAA loaded_sample", loaded_sample)
 
-        return self.get_component_by_address(
-            Container.Pin.get_sample_address(
-                self._selected_basket, self._selected_sample
-            )
-        )
+        return loaded_sample
+
 
     @trace_call_log
     def chained_load(self, sample_to_unload, sample_to_load):
@@ -495,8 +511,12 @@ class XRD2SampleChanger(SampleChanger):
             (Object): Value returned by _execute_task either a Task or result of the
                       operation
         """
-        sample = self._resolve_component(sample)
         self.assert_ready_for_load()
+        sample = self._resolve_component(sample)
+
+        print("Sample resolved:")
+        print(sample)
+
         # Do a chained load in this case
         if self.has_loaded_sample():
             # Do a chained load in this case
@@ -507,16 +527,16 @@ class XRD2SampleChanger(SampleChanger):
                     + " is already loaded"
                 )
             return self.chained_load(self.get_loaded_sample(), sample)
-        return self._do_load(sample)
+        self._do_load(sample)
 
     @trace_call_log
-    def unload(self, sample_slot=None, wait=True):
+    def unload(self, sample=None, wait=True):
         """
         Unload sample to location sample_slot, unloads to the same slot as it
         was loaded from if None is passed
 
         Args:
-            sample_slot (tuple): sample address on the form
+            sample (tuple): sample address on the form
                                (component1, ... ,component_N-1, component_N)
             wait: If True wait for unload to finish otherwise return immediately
 
@@ -524,13 +544,12 @@ class XRD2SampleChanger(SampleChanger):
             (Object): Value returned by _execute_task either a Task or result of the
                       operation
         """
-        sample_slot = self._resolve_component(sample_slot)
         self.assert_ready_for_unload()
+        sample = self._resolve_component(sample)
         # In case we have manually mounted we can command an unmount
         if not self.has_loaded_sample():
             raise Exception("No sample is loaded")
-        self._do_unload(sample_slot)
-
+        self._do_unload(sample)
 
     @trace_call_log
     def reset(self, wait=True):
@@ -570,7 +589,7 @@ class XRD2SampleChanger(SampleChanger):
             self._update_state()
 
     @trace_call_log
-    def _do_load(self, sample_location, wait=False):
+    def _do_load(self, sample, wait=False):
         start_timestamp_RA = time.time()
         action_Type_RA = "LOAD"
         status_RA = "skip"
@@ -580,7 +599,7 @@ class XRD2SampleChanger(SampleChanger):
         if self._hw_state in [StaubliStates.DEFROST, StaubliStates.COOLDOWN]:
             self._wait_defrost_and_cooldown(operation="sample loading")
 
-        # Abort if single pin is detected
+        # Abort if single pin and a pin is detected
         sc_gripper = self.get_gripper_type()
         if sc_gripper == GripperType.Single and self.is_pin_detected():
             err_msg = "Sample loading aborted! Pin is expected not to be present but it's detected instead."
@@ -598,75 +617,55 @@ class XRD2SampleChanger(SampleChanger):
         #         self.user_log.error(err_msg)
         #         raise RuntimeError("SampleChangerElettra_XRD2.load ABORTED: %s" % logmsg)
 
-        if isinstance(sample_location, tuple):
-            basket, sample = sample_location
+        if isinstance(sample, tuple):
+            basket_no, sample_no = sample
         else:
-            basket, sample = sample_location.split(":")
+            basket_no, sample_no = sample.split(":")
 
         status_RA = "ERROR"
 
-        dewarLocationRA = int(basket)
-        containerLocationRA = int(sample)
+        dewarLocationRA = int(basket_no)
+        containerLocationRA = int(sample_no)
         try:
-            if self.get_loaded_sample() is None:
-                old_basket_selected, old_sample_selected = 0, 1
+            self._selected_sample = sample_no
+            self._selected_basket = basket_no
+            sample_to_unload: Sample = self.get_loaded_sample() # It will be None if single gripper
+            sample_to_load = self.get_component_by_address(
+                Container.Pin.get_sample_address(int(basket_no), int(sample_no))
+            )
+            if sample_to_unload is None:
+                samp_to_unload_basket_no, samp_to_unload_sample_no = 0, 1
             else:
-                old_basket_selected, old_sample_selected = (
-                    self._selected_basket,
-                    self._selected_sample,
-                )
-            self._selected_sample = sample
-            self._selected_basket = basket
-
+                samp_to_unload_basket_no, samp_to_unload_sample_no = sample_to_unload.get_coords()
             if sc_gripper == GripperType.Double:
-                self._basket_2_swap = old_basket_selected
-                self._sample_2_swap = old_sample_selected
+                self._basket_2_swap = samp_to_unload_basket_no
+                self._sample_2_swap = samp_to_unload_sample_no
                 self.cmd_start_method("swap")
-                self.log.info('"swapping" command sent to the tango device %s', self.cmd_start_method.device_name)
+                self.log.info('"swapping" execution request sent to the tango device "%s"', self.cmd_start_method.device_name)
             else:
                 self.cmd_start_method("mount")
-                self.log.info('"mount" command sent to the tango device %s', self.cmd_start_method.device_name)
+                self.log.info('"mount"  execution request sent to the tango device "%s"', self.cmd_start_method.device_name)
 
             sleep(1)
             self._wait_method_execution()
 
             sc_action_failed = self.ch_script_failed.get_value()
-            sample_obj = self.get_component_by_address(
-                Container.Pin.get_sample_address(int(basket), int(sample))
-            )
-
-            if sc_gripper == GripperType.Double:
-                unloaded_sample_obj = self.get_component_by_address(
-                    Container.Pin.get_sample_address(
-                        int(old_basket_selected), int(old_sample_selected)
-                    )
-                )
-                if unloaded_sample_obj:
-                    loaded = has_been_loaded = False
-                    unloaded_sample_obj._set_loaded(loaded, has_been_loaded)
-
             if sc_action_failed:
                 # Check on pin detection and sample changer status done in executer
                 err_msg = "Mounting Script Failed!"
                 step_by_step = self.ch_step_by_step_log.get_value()
-                self.log.error(
-                    f"Sample loading failed! {err_msg} - StepByStepLog: {step_by_step})"
-                )
-                loaded = has_been_loaded = False
-                sample_obj._set_loaded(loaded, has_been_loaded)
+                self.log.error(f"Sample loading failed! %s - StepByStepLog: %s)" % (err_msg, step_by_step))
+                self._reset_loaded_sample()
                 self._selected_sample = -1
                 self._selected_basket = -1
             else:
-                err_msg = ""
-                loaded = has_been_loaded = True
-                sample_obj._set_loaded(loaded, has_been_loaded)
-                self.log.info(f"Sample loaded successfully! Sample %s has been mounted", str(sample_obj.get_coords()))
+                self._set_loaded_sample(sample_to_load)
+                self.log.info(f"Sample loaded successfully! Sample %s has been mounted", str(sample_to_load.get_coords()))
                 status_RA = "SUCCESS"
 
         except Exception:
             self.log.exception("Error occurred during load method execution")
-            self._selected_basket = -1
-            self._selected_sample = -1
+            self._reset_loaded_sample()
 
         finally:
             try:
@@ -691,7 +690,7 @@ class XRD2SampleChanger(SampleChanger):
     def _do_unload(self, sample_location=None, wait=None):
         startTimestampRA = time.time()
         actionTypeRA = "UNLOAD"
-        statusRA = "skip"
+        status_RA = "skip"
         messageRA = ""
 
         # Wait defrost or cooldown finishing
@@ -710,16 +709,16 @@ class XRD2SampleChanger(SampleChanger):
         #         raise RuntimeError(err_msg)
 
         if isinstance(sample_location, tuple):
-            basket, sample = sample_location
+            basket_no, sample_no = sample_location
         else:
-            basket, sample = sample_location.split(":")
+            basket_no, sample_no = sample_location.split(":")
 
-        statusRA = "ERROR"
-        dewarLocationRA = int(basket)
-        containerLocationRA = int(sample)
+        status_RA = "ERROR"
+        dewarLocationRA = int(basket_no)
+        containerLocationRA = int(sample_no)
         try:
             self.cmd_start_method("unmount")
-            self.log.info('"unmount" command sent to the tango device %s', self.cmd_start_method.device_name)
+            self.log.info('"unmount" execution request sent to the tango device "%s"', self.cmd_start_method.device_name)
             sleep(1)
             self._wait_method_execution()
             sc_action_failed = self.ch_script_failed.get_value()
@@ -728,28 +727,18 @@ class XRD2SampleChanger(SampleChanger):
                 step_by_step = self.ch_step_by_step_log.get_value()
                 self.log.error("Sample unloading failed! %s - StepByStepLog: %s)", (err_msg, step_by_step))
             else:
-                sample_obj = self.get_component_by_address(
-                    Container.Pin.get_sample_address(
-                        self._selected_basket, self._selected_sample
-                    )
-                )
-                loaded = has_been_loaded = False
-                sample_obj._set_loaded(loaded, has_been_loaded)
-                self._selected_basket = -1
-                self._selected_sample = -1
-
-                statusRA = "SUCCESS"
-                self.log.debug("Sample unloaded successfully! Sample %s has been mounted", str(sample_obj.get_coords()))
-
+                status_RA = "SUCCESS"
+                self.log.debug('Sample "%s" unloaded successfully!', sample_location)
         except Exception:
-            self.log.exception("Unexpected error occurred during load method execution")
+            self.log.exception("Unexpected error occurred during `_do_unload` method execution")
         finally:
+            self._reset_loaded_sample()
             try:
-                if statusRA is not "skip":
+                if status_RA is not "skip":
                     # TODO implementa store_robo_action
                     # self.lims.set_robot_action(dewarLocation=dewarLocationRA,
                     #                                  containerLocation=containerLocationRA, actionType=actionTypeRA,
-                    #                                  status=statusRA, message=messageRA,
+                    #                                  status=status_RA, message=messageRA,
                     #                                  startTimestamp=startTimestampRA, endTimestamp=time.time())
                     # ND20241225: ISPyB don't store strategies yet - using tmp file, better removed changing sample...
                     import os
@@ -759,8 +748,6 @@ class XRD2SampleChanger(SampleChanger):
                         os.remove(best_strategy)
             except:
                 pass
-        self._trigger_loaded_sample_changed_event(self.get_loaded_sample())
-        return
 
     @trace_call_log
     def _wait_defrost_and_cooldown(self, operation: str = "operation"):
@@ -1000,9 +987,9 @@ class XRD2SampleChanger(SampleChanger):
         return self.get_pin_state() == PinStatus.Detected
 
     @trace_call_log
-    def validate_pin_detection(self):
+    def handle_state_on_mismatch(self):
         """Validate consistency between hardware pin detection and internal variable"""
-        if self.is_pin_detected() and -1 in [self._selected_basket, self._selected_sample]:
+        if self.last_pin_status_value == PinStatus.Detected and super().get_loaded_sample():
             if not self.pin_detection_mismatched:
                 self.pin_detection_mismatched = True
                 err_msg = (
@@ -1047,23 +1034,31 @@ class XRD2SampleChanger(SampleChanger):
 
     @trace_call_log
     def assert_ready_for_load(self):
+        err_msg = ""
         if not self.is_state_in([StaubliStates.IDLE, StaubliStates.DEFROST, StaubliStates.COOLDOWN]):
             err_msg = (
-                f'Sample can not be loaded! The sample changer hw state must be "IDLE", "DEFROST" or "COOLDOWN" '
+                f'Sample loading aborted! The sample changer hw state must be "IDLE", "DEFROST" or "COOLDOWN" '
                 f' (Current hw state: {self._hw_state.name}).'
                 f' Use the sample changer actions to manage it (click on the equipment tab).'
             )
+        if self.get_pin_state() == PinStatus.Detected and self.get_gripper_type() == GripperType.Single:
+            err_msg = 'Sample loading aborted! A sample is already mounted'
+        if err_msg:
             self.user_log.error(err_msg)
             raise RuntimeError(err_msg)
 
     @trace_call_log
     def assert_ready_for_unload(self):
+        err_msg = ""
         if not self.is_state_in([StaubliStates.IDLE, StaubliStates.DEFROST, StaubliStates.COOLDOWN]):
             err_msg = (
-                f'Sample can not be unloaded! The sample changer hw state must be "IDLE", "DEFROST" or "COOLDOWN" '
+                f'Sample unloading aborted! The sample changer hw state must be "IDLE", "DEFROST" or "COOLDOWN" '
                 f' (Current hw state: {self._hw_state.name}).'
                 f' Use the sample changer actions to manage it (click on the equipment tab).'
             )
+        if self.get_pin_state() == PinStatus.Detected and self.get_gripper_type() == GripperType.Single:
+            err_msg = 'Sample unloading aborted! A sample is already mounted'
+        if err_msg:
             self.user_log.error(err_msg)
             raise RuntimeError(err_msg)
 
